@@ -886,15 +886,23 @@
                 placeholder="Obfuscation password"
               ></a-input>
             </a-form-item>
-            <a-form-item
-              label="Domain"
-              v-if="['header-dns', 'xdns'].includes(mask.type)"
-            >
+            <a-form-item label="Domain" v-if="mask.type === 'header-dns'">
               <a-input
                 v-model.trim="mask.settings.domain"
                 placeholder="e.g., www.example.com"
               ></a-input>
             </a-form-item>
+            <template v-if="mask.type === 'xdns'">
+              <a-form-item label="Resolvers">
+                <a-select
+                  mode="tags"
+                  v-model="mask.settings.resolvers"
+                  :style="{ width: '100%' }"
+                  :token-separators="[',']"
+                  placeholder="e.g., xxx+udp://8.8.8.8:53"
+                ></a-select>
+              </a-form-item>
+            </template>
             <template v-if="mask.type === 'header-custom'">
               <a-form-item label="Client">
                 <a-icon

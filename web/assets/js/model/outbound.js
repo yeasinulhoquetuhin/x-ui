@@ -573,8 +573,9 @@ class UdpMask extends CommonClass {
             case 'mkcp-aes128gcm':
                 return { password: settings.password || '' };
             case 'header-dns':
-            case 'xdns':
                 return { domain: settings.domain || '' };
+            case 'xdns':
+                return { resolvers: Array.isArray(settings.resolvers) ? settings.resolvers : [] };
             case 'xicmp':
                 return { ip: settings.ip || '', id: settings.id ?? 0 };
             case 'mkcp-original':
