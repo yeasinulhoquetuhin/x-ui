@@ -169,18 +169,16 @@ class KcpStreamSettings extends CommonClass {
         tti = 20,
         uplinkCapacity = 5,
         downlinkCapacity = 20,
-        congestion = false,
-        readBufferSize = 1,
-        writeBufferSize = 1,
+        cwndMultiplier = 0,
+        maxSendingWindow = 0,
     ) {
         super();
         this.mtu = mtu;
         this.tti = tti;
         this.upCap = uplinkCapacity;
         this.downCap = downlinkCapacity;
-        this.congestion = congestion;
-        this.readBuffer = readBufferSize;
-        this.writeBuffer = writeBufferSize;
+        this.cwndMultiplier = cwndMultiplier;
+        this.maxSendingWindow = maxSendingWindow;
     }
 
     static fromJson(json = {}) {
@@ -189,9 +187,8 @@ class KcpStreamSettings extends CommonClass {
             json.tti,
             json.uplinkCapacity,
             json.downlinkCapacity,
-            json.congestion,
-            json.readBufferSize,
-            json.writeBufferSize,
+            json.cwndMultiplier,
+            json.maxSendingWindow,
         );
     }
 
@@ -201,9 +198,8 @@ class KcpStreamSettings extends CommonClass {
             tti: this.tti,
             uplinkCapacity: this.upCap,
             downlinkCapacity: this.downCap,
-            congestion: this.congestion,
-            readBufferSize: this.readBuffer,
-            writeBufferSize: this.writeBuffer,
+            cwndMultiplier: this.cwndMultiplier,
+            maxSendingWindow: this.maxSendingWindow,
         };
     }
 }
