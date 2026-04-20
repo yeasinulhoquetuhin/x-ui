@@ -322,22 +322,30 @@ func (s *SubJsonService) genVless(inbound *model.Inbound, streamSettings json_ut
 		outbound.Mux = json_util.RawMessage(s.mux)
 	}
 	outbound.StreamSettings = streamSettings
-	settings := make(map[string]any)
-	settings["address"] = inbound.Listen
-	settings["port"] = inbound.Port
-	settings["id"] = client.ID
-	if client.Flow != "" {
-		settings["flow"] = client.Flow
-	}
 
 	// Add encryption for VLESS outbound from inbound settings
 	var inboundSettings map[string]any
 	json.Unmarshal([]byte(inbound.Settings), &inboundSettings)
-	if encryption, ok := inboundSettings["encryption"].(string); ok {
-		settings["encryption"] = encryption
+	encryption, _ := inboundSettings["encryption"].(string)
+
+	user := map[string]any{
+		"id":         client.ID,
+		"level":      8,
+		"encryption": encryption,
+	}
+	if client.Flow != "" {
+		user["flow"] = client.Flow
 	}
 
-	outbound.Settings = settings
+	vnext := map[string]any{
+		"address": inbound.Listen,
+		"port":    inbound.Port,
+		"users":   []any{user},
+	}
+
+	outbound.Settings = map[string]any{
+		"vnext": []any{vnext},
+	}
 	result, _ := json.MarshalIndent(outbound, "", "  ")
 	return result
 }
