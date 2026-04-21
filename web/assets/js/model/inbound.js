@@ -1830,6 +1830,16 @@ class Inbound extends XrayCommonClass {
         if (this.stream.tls.settings.echConfigList?.length > 0) params.set("ech", this.stream.tls.settings.echConfigList.join(','));
         if (this.stream.tls.sni?.length > 0) params.set("sni", this.stream.tls.sni);
 
+        const udpMasks = this.stream?.finalmask?.udp;
+        if (Array.isArray(udpMasks)) {
+            const salamanderMask = udpMasks.find(mask => mask?.type === 'salamander');
+            const obfsPassword = salamanderMask?.settings?.password;
+            if (typeof obfsPassword === 'string' && obfsPassword.length > 0) {
+                params.set("obfs", "salamander");
+                params.set("obfs-password", obfsPassword);
+            }
+        }
+
         const url = new URL(link);
         for (const [key, value] of params) {
             url.searchParams.set(key, value);
