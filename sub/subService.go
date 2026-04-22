@@ -115,12 +115,14 @@ func (s *SubService) GetSubs(subId string, host string) ([]string, int64, xray.C
 func (s *SubService) getInboundsBySubId(subId string) ([]*model.Inbound, error) {
 	db := database.GetDB()
 	var inbounds []*model.Inbound
+	// allow "hysteria2" so imports stored with the literal v2 protocol
+	// string still surface here (#4081)
 	err := db.Model(model.Inbound{}).Preload("ClientStats").Where(`id in (
 		SELECT DISTINCT inbounds.id
 		FROM inbounds,
-			JSON_EACH(JSON_EXTRACT(inbounds.settings, '$.clients')) AS client 
+			JSON_EACH(JSON_EXTRACT(inbounds.settings, '$.clients')) AS client
 		WHERE
-			protocol in ('vmess','vless','trojan','shadowsocks','hysteria')
+			protocol in ('vmess','vless','trojan','shadowsocks','hysteria','hysteria2')
 			AND JSON_EXTRACT(client.value, '$.subId') = ? AND enable = ?
 	)`, subId, true).Find(&inbounds).Error
 	if err != nil {
@@ -171,7 +173,7 @@ func (s *SubService) getLink(inbound *model.Inbound, email string) string {
 		return s.genTrojanLink(inbound, email)
 	case "shadowsocks":
 		return s.genShadowsocksLink(inbound, email)
-	case "hysteria":
+	case "hysteria", "hysteria2":
 		return s.genHysteriaLink(inbound, email)
 	}
 	return ""
@@ -906,7 +908,7 @@ func (s *SubService) genShadowsocksLink(inbound *model.Inbound, email string) st
 }
 
 func (s *SubService) genHysteriaLink(inbound *model.Inbound, email string) string {
-	if inbound.Protocol != model.Hysteria {
+	if !model.IsHysteria(inbound.Protocol) {
 		return ""
 	}
 	var stream map[string]interface{}

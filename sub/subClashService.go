@@ -159,13 +159,10 @@ func (s *SubClashService) getProxies(inbound *model.Inbound, client model.Client
 }
 
 func (s *SubClashService) buildProxy(inbound *model.Inbound, client model.Client, stream map[string]any, extraRemark string) map[string]any {
-	// Hysteria (v1 / v2) doesn't ride an xray `streamSettings.network`
-	// transport and the TLS story is handled inside hysteria itself, so
-	// applyTransport / applySecurity below don't model it. Build the
-	// proxy directly. Without this, hysteria inbounds fell into the
-	// `default: return nil` branch and silently vanished from the
-	// generated Clash config.
-	if inbound.Protocol == model.Hysteria {
+	// Hysteria has its own transport + TLS model, applyTransport /
+	// applySecurity don't fit. IsHysteria also covers the literal
+	// "hysteria2" protocol string (#4081).
+	if model.IsHysteria(inbound.Protocol) {
 		return s.buildHysteriaProxy(inbound, client, extraRemark)
 	}
 
