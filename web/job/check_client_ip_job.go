@@ -35,6 +35,25 @@ var job *CheckClientIpJob
 
 const defaultXrayAPIPort = 62789
 
+// ipStaleAfterSeconds controls how long a client IP kept in the
+// per-client tracking table (model.InboundClientIps.Ips) is considered
+// still "active" before it's evicted during the next scan.
+//
+// Without this eviction, an IP that connected once and then went away
+// keeps sitting in the table with its old timestamp. Because the
+// excess-IP selector sorts ascending ("oldest wins, newest loses") to
+// protect the original/current connections, that stale entry keeps
+// occupying a slot and the IP that is *actually* currently using the
+// config gets classified as "new excess" and banned by fail2ban on
+// every single run — producing the continuous ban loop from #4077.
+//
+// 30 minutes is chosen so an actively-streaming client (where xray
+// emits a fresh `accepted` log line whenever it opens a new TCP) will
+// always refresh its timestamp well within the window, but a client
+// that has really stopped using the config will drop out of the table
+// in a bounded time and free its slot.
+const ipStaleAfterSeconds = int64(30 * 60)
+
 // NewCheckClientIpJob creates a new client IP monitoring job instance.
 func NewCheckClientIpJob() *CheckClientIpJob {
 	job = new(CheckClientIpJob)
@@ -202,6 +221,31 @@ func (j *CheckClientIpJob) processLogFile() bool {
 	return shouldCleanLog
 }
 
+// mergeClientIps combines the persisted (old) and freshly observed (new)
+// IP-with-timestamp lists for a single client into a map. An entry is
+// dropped if its last-seen timestamp is older than staleCutoff.
+//
+// Extracted as a helper so updateInboundClientIps can stay DB-oriented
+// and the merge policy can be exercised by a unit test.
+func mergeClientIps(old, new []IPWithTimestamp, staleCutoff int64) map[string]int64 {
+	ipMap := make(map[string]int64, len(old)+len(new))
+	for _, ipTime := range old {
+		if ipTime.Timestamp < staleCutoff {
+			continue
+		}
+		ipMap[ipTime.IP] = ipTime.Timestamp
+	}
+	for _, ipTime := range new {
+		if ipTime.Timestamp < staleCutoff {
+			continue
+		}
+		if existingTime, ok := ipMap[ipTime.IP]; !ok || ipTime.Timestamp > existingTime {
+			ipMap[ipTime.IP] = ipTime.Timestamp
+		}
+	}
+	return ipMap
+}
+
 func (j *CheckClientIpJob) checkFail2BanInstalled() bool {
 	cmd := "fail2ban-client"
 	args := []string{"-h"}
@@ -310,16 +354,9 @@ func (j *CheckClientIpJob) updateInboundClientIps(inboundClientIps *model.Inboun
 		json.Unmarshal([]byte(inboundClientIps.Ips), &oldIpsWithTime)
 	}
 
-	// Merge old and new IPs, keeping the latest timestamp for each IP
-	ipMap := make(map[string]int64)
-	for _, ipTime := range oldIpsWithTime {
-		ipMap[ipTime.IP] = ipTime.Timestamp
-	}
-	for _, ipTime := range newIpsWithTime {
-		if existingTime, ok := ipMap[ipTime.IP]; !ok || ipTime.Timestamp > existingTime {
-			ipMap[ipTime.IP] = ipTime.Timestamp
-		}
-	}
+	// Merge old and new IPs, evicting entries that haven't been
+	// re-observed in a while. See mergeClientIps / #4077 for why.
+	ipMap := mergeClientIps(oldIpsWithTime, newIpsWithTime, time.Now().Unix()-ipStaleAfterSeconds)
 
 	// Convert back to slice and sort by timestamp (oldest first)
 	// This ensures we always protect the original/current connections and ban new excess ones.
