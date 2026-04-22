@@ -270,7 +270,7 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 			if client.Email == "" {
 				return inbound, false, common.NewError("empty client ID")
 			}
-		case "hysteria":
+		case "hysteria", "hysteria2":
 			if client.Auth == "" {
 				return inbound, false, common.NewError("empty client ID")
 			}
@@ -675,7 +675,7 @@ func (s *InboundService) AddInboundClient(data *model.Inbound) (bool, error) {
 			if client.Email == "" {
 				return false, common.NewError("empty client ID")
 			}
-		case "hysteria":
+		case "hysteria", "hysteria2":
 			if client.Auth == "" {
 				return false, common.NewError("empty client ID")
 			}
@@ -769,7 +769,7 @@ func (s *InboundService) DelInboundClient(inboundId int, clientId string) (bool,
 		client_key = "password"
 	case "shadowsocks":
 		client_key = "email"
-	case "hysteria":
+	case "hysteria", "hysteria2":
 		client_key = "auth"
 	}
 
@@ -877,7 +877,7 @@ func (s *InboundService) UpdateInboundClient(data *model.Inbound, clientId strin
 		case "shadowsocks":
 			oldClientId = oldClient.Email
 			newClientId = clients[0].Email
-		case "hysteria":
+		case "hysteria", "hysteria2":
 			oldClientId = oldClient.Auth
 			newClientId = clients[0].Auth
 		default:
