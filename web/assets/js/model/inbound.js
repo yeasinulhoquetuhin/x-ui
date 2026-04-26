@@ -1566,6 +1566,8 @@ class Inbound extends XrayCommonClass {
             }
         } else if (network === 'kcp') {
             const kcp = this.stream.kcp;
+            obj.mtu = kcp.mtu;
+            obj.tti = kcp.tti;
         } else if (network === 'ws') {
             const ws = this.stream.ws;
             obj.path = ws.path;
@@ -1626,6 +1628,8 @@ class Inbound extends XrayCommonClass {
                 break;
             case "kcp":
                 const kcp = this.stream.kcp;
+                params.set("mtu", kcp.mtu);
+                params.set("tti", kcp.tti);
                 break;
             case "ws":
                 const ws = this.stream.ws;
@@ -1727,6 +1731,8 @@ class Inbound extends XrayCommonClass {
                 break;
             case "kcp":
                 const kcp = this.stream.kcp;
+                params.set("mtu", kcp.mtu);
+                params.set("tti", kcp.tti);
                 break;
             case "ws":
                 const ws = this.stream.ws;
@@ -1804,6 +1810,8 @@ class Inbound extends XrayCommonClass {
                 break;
             case "kcp":
                 const kcp = this.stream.kcp;
+                params.set("mtu", kcp.mtu);
+                params.set("tti", kcp.tti);
                 break;
             case "ws":
                 const ws = this.stream.ws;
