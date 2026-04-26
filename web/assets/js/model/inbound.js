@@ -1907,7 +1907,7 @@ class Inbound extends XrayCommonClass {
         return url.toString();
     }
 
-    getWireguardLink(address, port, remark, peerId) {
+    getWireguardTxt(address, port, remark, peerId) {
         let txt = `[Interface]\n`
         txt += `PrivateKey = ${this.settings.peers[peerId].privateKey}\n`
         txt += `Address = ${this.settings.peers[peerId].allowedIPs[0]}\n`
@@ -1927,6 +1927,48 @@ class Inbound extends XrayCommonClass {
             txt += `\nPersistentKeepalive = ${this.settings.peers[peerId].keepAlive}\n`
         }
         return txt;
+    }
+
+    getWireguardLink(address, port, remark, peerId) {
+        const peer = this.settings?.peers?.[peerId];
+        if (!peer) return '';
+
+        const link = `wireguard://${address}:${port}`;
+        const url = new URL(link);
+        url.username = peer.privateKey || '';
+
+        if (this.settings?.pubKey) {
+            url.searchParams.set("publickey", this.settings.pubKey);
+        }
+        if (Array.isArray(peer.allowedIPs) && peer.allowedIPs.length > 0 && peer.allowedIPs[0]) {
+            url.searchParams.set("address", peer.allowedIPs[0]);
+        }
+        if (this.settings?.mtu) {
+            url.searchParams.set("mtu", this.settings.mtu);
+        }
+
+        url.hash = encodeURIComponent(remark);
+        return url.toString();
+    }
+
+    genWireguardLinks(remark = '', remarkModel = '-ieo') {
+        const addr = !ObjectUtil.isEmpty(this.listen) && this.listen !== "0.0.0.0" ? this.listen : location.hostname;
+        const separationChar = remarkModel.charAt(0);
+        let links = [];
+        this.settings.peers.forEach((p, index) => {
+            links.push(this.getWireguardLink(addr, this.port, remark + separationChar + (index + 1), index));
+        });
+        return links.join('\r\n');
+    }
+
+    genWireguardConfigs(remark = '', remarkModel = '-ieo') {
+        const addr = !ObjectUtil.isEmpty(this.listen) && this.listen !== "0.0.0.0" ? this.listen : location.hostname;
+        const separationChar = remarkModel.charAt(0);
+        let links = [];
+        this.settings.peers.forEach((p, index) => {
+            links.push(this.getWireguardTxt(addr, this.port, remark + separationChar + (index + 1), index));
+        });
+        return links.join('\r\n');
     }
 
     genLink(address = '', port = this.port, forceTls = 'same', remark = '', client) {
@@ -1989,11 +2031,7 @@ class Inbound extends XrayCommonClass {
         } else {
             if (this.protocol == Protocols.SHADOWSOCKS && !this.isSSMultiUser) return this.genSSLink(addr, this.port, 'same', remark);
             if (this.protocol == Protocols.WIREGUARD) {
-                let links = [];
-                this.settings.peers.forEach((p, index) => {
-                    links.push(this.getWireguardLink(addr, this.port, remark + remarkModel.charAt(0) + (index + 1), index));
-                });
-                return links.join('\r\n');
+                return this.genWireguardConfigs(remark, remarkModel);
             }
             return '';
         }
