@@ -1085,11 +1085,23 @@ class UdpMask extends XrayCommonClass {
             case 'header-wireguard':
                 return {};
             case 'header-custom':
-                return { client: [], server: [] };
+                return {
+                    client: Array.isArray(settings.client) ? settings.client : [],
+                    server: Array.isArray(settings.server) ? settings.server : [],
+                };
             case 'noise':
-                return { reset: 0, noise: [] };
+                return {
+                    reset: settings.reset ?? 0,
+                    noise: Array.isArray(settings.noise) ? settings.noise : [],
+                };
             case 'sudoku':
-                return { ascii: '', customTable: '', customTables: [], paddingMin: 0, paddingMax: 0 };
+                return {
+                    ascii: settings.ascii || '',
+                    customTable: settings.customTable || '',
+                    customTables: settings.customTables ?? [],
+                    paddingMin: settings.paddingMin ?? 0,
+                    paddingMax: settings.paddingMax ?? 0,
+                };
             default:
                 return settings;
         }
@@ -1103,9 +1115,30 @@ class UdpMask extends XrayCommonClass {
     }
 
     toJson() {
+        const cleanItem = item => {
+            const out = { ...item };
+            if (out.type === 'array') {
+                delete out.packet;
+            } else {
+                out.rand = 0;
+            }
+            return out;
+        };
+
+        let settings = this.settings;
+        if (this.type === 'noise' && settings && Array.isArray(settings.noise)) {
+            settings = { ...settings, noise: settings.noise.map(cleanItem) };
+        } else if (this.type === 'header-custom' && settings) {
+            settings = {
+                ...settings,
+                client: Array.isArray(settings.client) ? settings.client.map(cleanItem) : settings.client,
+                server: Array.isArray(settings.server) ? settings.server.map(cleanItem) : settings.server,
+            };
+        }
+
         return {
             type: this.type,
-            settings: (this.settings && Object.keys(this.settings).length > 0) ? this.settings : undefined
+            settings: (settings && Object.keys(settings).length > 0) ? settings : undefined
         };
     }
 }

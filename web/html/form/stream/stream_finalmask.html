@@ -116,16 +116,11 @@
               :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }"
             ></a-icon>
           </a-divider>
-          <a-form-item label="Rand">
-            <a-input-number v-model.number="c.rand" />
-          </a-form-item>
-          <a-form-item label="Rand Range">
-            <a-input v-model.trim="c.randRange" placeholder="0-255" />
-          </a-form-item>
           <a-form-item label='{{ i18n "pages.xray.outbound.type" }}'>
             <a-select
               v-model="c.type"
               :dropdown-class-name="themeSwitcher.currentTheme"
+              @change="t => { if(t === 'base64') c.packet = RandomUtil.randomBase64(); else if(t === 'array') c.packet = []; else c.packet = ''; }"
             >
               <a-select-option value="array">Array</a-select-option>
               <a-select-option value="str">String</a-select-option>
@@ -133,8 +128,20 @@
               <a-select-option value="base64">Base64</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="Packet">
-            <a-input v-model.trim="c.packet" placeholder="binary data" />
+          <template v-if="c.type === 'array'">
+            <a-form-item label="Rand">
+              <a-input-number v-model.number="c.rand" />
+            </a-form-item>
+            <a-form-item label="Rand Range">
+              <a-input v-model.trim="c.randRange" placeholder="0-255" />
+            </a-form-item>
+          </template>
+          <a-form-item v-else label="Packet">
+            <a-input-group compact v-if="c.type === 'base64'">
+              <a-input v-model.trim="c.packet" placeholder="binary data" :style="{ width: 'calc(100% - 32px)' }" />
+              <a-button icon="reload" @click="c.packet = RandomUtil.randomBase64()" />
+            </a-input-group>
+            <a-input v-else v-model.trim="c.packet" placeholder="binary data" />
           </a-form-item>
         </template>
         <a-divider :style="{ margin: '0' }"></a-divider>
@@ -155,16 +162,11 @@
               :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }"
             ></a-icon>
           </a-divider>
-          <a-form-item label="Rand">
-            <a-input-number v-model.number="s.rand" />
-          </a-form-item>
-          <a-form-item label="Rand Range">
-            <a-input v-model.trim="s.randRange" placeholder="0-255" />
-          </a-form-item>
           <a-form-item label='{{ i18n "pages.xray.outbound.type" }}'>
             <a-select
               v-model="s.type"
               :dropdown-class-name="themeSwitcher.currentTheme"
+              @change="t => { if(t === 'base64') s.packet = RandomUtil.randomBase64(); else if(t === 'array') s.packet = []; else s.packet = ''; }"
             >
               <a-select-option value="array">Array</a-select-option>
               <a-select-option value="str">String</a-select-option>
@@ -172,8 +174,20 @@
               <a-select-option value="base64">Base64</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="Packet">
-            <a-input v-model.trim="s.packet" placeholder="binary data" />
+          <template v-if="s.type === 'array'">
+            <a-form-item label="Rand">
+              <a-input-number v-model.number="s.rand" />
+            </a-form-item>
+            <a-form-item label="Rand Range">
+              <a-input v-model.trim="s.randRange" placeholder="0-255" />
+            </a-form-item>
+          </template>
+          <a-form-item v-else label="Packet">
+            <a-input-group compact v-if="s.type === 'base64'">
+              <a-input v-model.trim="s.packet" placeholder="binary data" :style="{ width: 'calc(100% - 32px)' }" />
+              <a-button icon="reload" @click="s.packet = RandomUtil.randomBase64()" />
+            </a-input-group>
+            <a-input v-else v-model.trim="s.packet" placeholder="binary data" />
           </a-form-item>
         </template>
       </template>
@@ -186,7 +200,7 @@
             type="plus"
             type="primary"
             size="small"
-            @click="mask.settings.noise.push({rand: '1-8192', randRange: '0-255', type: 'array', packet: '', delay: ''})"
+            @click="mask.settings.noise.push({rand: '1-8192', randRange: '0-255', type: 'array', packet: [], delay: '10-20'})"
           />
         </a-form-item>
         <template v-for="(n, index) in mask.settings.noise" :key="index">
@@ -198,16 +212,11 @@
               :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }"
             ></a-icon>
           </a-divider>
-          <a-form-item label="Rand">
-            <a-input v-model.trim="n.rand" placeholder="1-8192" />
-          </a-form-item>
-          <a-form-item label="Rand Range">
-            <a-input v-model.trim="n.randRange" placeholder="0-255" />
-          </a-form-item>
           <a-form-item label='{{ i18n "pages.xray.outbound.type" }}'>
             <a-select
               v-model="n.type"
               :dropdown-class-name="themeSwitcher.currentTheme"
+              @change="t => { if(t === 'base64') n.packet = RandomUtil.randomBase64(); else if(t === 'array') n.packet = []; else n.packet = ''; }"
             >
               <a-select-option value="array">Array</a-select-option>
               <a-select-option value="str">String</a-select-option>
@@ -215,8 +224,20 @@
               <a-select-option value="base64">Base64</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="Packet">
-            <a-input v-model.trim="n.packet" placeholder="binary data" />
+          <template v-if="n.type === 'array'">
+            <a-form-item label="Rand">
+              <a-input v-model.trim="n.rand" placeholder="0 or 1-8192" />
+            </a-form-item>
+            <a-form-item label="Rand Range">
+              <a-input v-model.trim="n.randRange" placeholder="0-255" />
+            </a-form-item>
+          </template>
+          <a-form-item v-else label="Packet">
+            <a-input-group compact v-if="n.type === 'base64'">
+              <a-input v-model.trim="n.packet" placeholder="binary data" :style="{ width: 'calc(100% - 32px)' }" />
+              <a-button icon="reload" @click="n.packet = RandomUtil.randomBase64()" />
+            </a-input-group>
+            <a-input v-else v-model.trim="n.packet" placeholder="binary data" />
           </a-form-item>
           <a-form-item label="Delay">
             <a-input v-model.trim="n.delay" placeholder="10-20" />
