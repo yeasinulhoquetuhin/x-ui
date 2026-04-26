@@ -190,22 +190,73 @@
             >
           </a-select>
         </a-form-item>
-        <a-form-item label="non-IP queries">
-          <a-select
-            v-model="outbound.settings.nonIPQuery"
-            :dropdown-class-name="themeSwitcher.currentTheme"
-          >
-            <a-select-option v-for="s in ['reject','drop','skip']" :value="s"
-              >[[ s ]]</a-select-option
-            >
-          </a-select>
+        <a-form-item label="Rules">
+          <a-button
+            icon="plus"
+            type="primary"
+            size="small"
+            @click="outbound.settings.addRule()"
+          ></a-button>
         </a-form-item>
-        <a-form-item
-          v-if="outbound.settings.nonIPQuery === 'skip'"
-          label="Block Types"
+
+        <a-form
+          v-for="(rule, index) in outbound.settings.rules"
+          :colon="false"
+          :label-col="{ md: {span:8} }"
+          :wrapper-col="{ md: {span:14} }"
         >
-          <a-input v-model.number="outbound.settings.blockTypes"></a-input>
-        </a-form-item>
+          <a-divider :style="{ margin: '0' }">
+            Rule [[ index + 1 ]]
+            <a-icon
+              type="delete"
+              @click="() => outbound.settings.delRule(index)"
+              :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }"
+            ></a-icon>
+          </a-divider>
+
+          <a-form-item label="Action">
+            <a-select
+              v-model="rule.action"
+              :dropdown-class-name="themeSwitcher.currentTheme"
+            >
+              <a-select-option v-for="action in DNSRuleActions" :value="action"
+                >[[ action ]]</a-select-option
+              >
+            </a-select>
+          </a-form-item>
+
+          <a-form-item>
+            <template slot="label">
+              <a-tooltip>
+                <template slot="title">
+                  <span>Single qtype (e.g. 28) or list/range (e.g. 1,3,23-24)</span>
+                </template>
+                QType
+                <a-icon type="question-circle"></a-icon>
+              </a-tooltip>
+            </template>
+            <a-input
+              v-model.trim="rule.qtype"
+              placeholder="1,3,23-24"
+            ></a-input>
+          </a-form-item>
+
+          <a-form-item>
+            <template slot="label">
+              <a-tooltip>
+                <template slot="title">
+                  <span>Comma-separated domain rules, e.g. domain:example.com,full:example.com</span>
+                </template>
+                Domain
+                <a-icon type="question-circle"></a-icon>
+              </a-tooltip>
+            </template>
+            <a-input
+              v-model.trim="rule.domain"
+              placeholder="domain:example.com,full:example.com"
+            ></a-input>
+          </a-form-item>
+        </a-form>
       </template>
 
       <!-- wireguard settings -->

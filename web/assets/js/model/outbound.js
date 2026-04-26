@@ -97,6 +97,74 @@ const Address_Port_Strategy = {
     TxtPortAndAddress: "txtportandaddress"
 };
 
+const DNSRuleActions = ['direct', 'drop', 'reject', 'hijack'];
+
+function normalizeDNSRuleField(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    if (Array.isArray(value)) {
+        return value.map(item => item.toString().trim()).filter(item => item.length > 0).join(',');
+    }
+    return value.toString().trim();
+}
+
+function normalizeDNSRuleAction(action) {
+    action = ObjectUtil.isEmpty(action) ? 'direct' : action.toString().toLowerCase().trim();
+    return DNSRuleActions.includes(action) ? action : 'direct';
+}
+
+function parseLegacyDNSBlockTypes(blockTypes) {
+    if (blockTypes === null || blockTypes === undefined || blockTypes === '') {
+        return [];
+    }
+
+    if (Array.isArray(blockTypes)) {
+        return blockTypes
+            .map(item => Number(item))
+            .filter(item => Number.isInteger(item) && item >= 0 && item <= 65535);
+    }
+
+    if (typeof blockTypes === 'number') {
+        return Number.isInteger(blockTypes) && blockTypes >= 0 && blockTypes <= 65535 ? [blockTypes] : [];
+    }
+
+    return blockTypes
+        .toString()
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => /^\d+$/.test(item))
+        .map(item => Number(item))
+        .filter(item => item >= 0 && item <= 65535);
+}
+
+function buildLegacyDNSRules(nonIPQuery, blockTypes) {
+    const mode = ['reject', 'drop', 'skip'].includes(nonIPQuery) ? nonIPQuery : 'reject';
+    const rules = [];
+    const parsedBlockTypes = parseLegacyDNSBlockTypes(blockTypes);
+
+    if (parsedBlockTypes.length > 0) {
+        rules.push(new Outbound.DNSRule(mode === 'reject' ? 'reject' : 'drop', parsedBlockTypes.join(',')));
+    }
+
+    rules.push(new Outbound.DNSRule('hijack', '1,28'));
+    rules.push(new Outbound.DNSRule(mode === 'skip' ? 'direct' : mode));
+
+    return rules;
+}
+
+function getDNSRulesFromJson(json = {}) {
+    if (Array.isArray(json.rules) && json.rules.length > 0) {
+        return json.rules.map(rule => Outbound.DNSRule.fromJson(rule));
+    }
+
+    if (json.nonIPQuery !== undefined || json.blockTypes !== undefined) {
+        return buildLegacyDNSRules(json.nonIPQuery, json.blockTypes);
+    }
+
+    return [];
+}
+
 Object.freeze(Protocols);
 Object.freeze(SSMethods);
 Object.freeze(TLS_FLOW_CONTROL);
@@ -107,6 +175,7 @@ Object.freeze(WireguardDomainStrategy);
 Object.freeze(USERS_SECURITY);
 Object.freeze(MODE_OPTION);
 Object.freeze(Address_Port_Strategy);
+Object.freeze(DNSRuleActions);
 
 class CommonClass {
 
@@ -1277,20 +1346,69 @@ Outbound.BlackholeSettings = class extends CommonClass {
         };
     }
 };
+
+Outbound.DNSRule = class extends CommonClass {
+    constructor(action = 'direct', qtype = '', domain = '') {
+        super();
+        this.action = action;
+        this.qtype = qtype;
+        this.domain = domain;
+    }
+
+    static fromJson(json = {}) {
+        return new Outbound.DNSRule(
+            json.action,
+            normalizeDNSRuleField(json.qtype),
+            normalizeDNSRuleField(json.domain),
+        );
+    }
+
+    toJson() {
+        const rule = {
+            action: normalizeDNSRuleAction(this.action),
+        };
+
+        const qtype = normalizeDNSRuleField(this.qtype);
+        if (!ObjectUtil.isEmpty(qtype)) {
+            if (/^\d+$/.test(qtype)) {
+                rule.qtype = Number(qtype);
+            } else {
+                rule.qtype = qtype;
+            }
+        }
+
+        const domains = normalizeDNSRuleField(this.domain)
+            .split(',')
+            .map(d => d.trim())
+            .filter(d => d.length > 0);
+        if (domains.length > 0) {
+            rule.domain = domains;
+        }
+
+        return rule;
+    }
+};
+
 Outbound.DNSSettings = class extends CommonClass {
     constructor(
         network = 'udp',
         address = '',
         port = 53,
-        nonIPQuery = 'reject',
-        blockTypes = []
+        rules = []
     ) {
         super();
         this.network = network;
         this.address = address;
         this.port = port;
-        this.nonIPQuery = nonIPQuery;
-        this.blockTypes = blockTypes;
+        this.rules = Array.isArray(rules) ? rules.map(rule => rule instanceof Outbound.DNSRule ? rule : Outbound.DNSRule.fromJson(rule)) : [];
+    }
+
+    addRule(action = 'direct') {
+        this.rules.push(new Outbound.DNSRule(action));
+    }
+
+    delRule(index) {
+        this.rules.splice(index, 1);
     }
 
     static fromJson(json = {}) {
@@ -1298,9 +1416,22 @@ Outbound.DNSSettings = class extends CommonClass {
             json.network,
             json.address,
             json.port,
-            json.nonIPQuery,
-            json.blockTypes,
+            getDNSRulesFromJson(json),
         );
+    }
+
+    toJson() {
+        const json = {
+            network: this.network,
+            address: this.address,
+            port: this.port,
+        };
+
+        if (this.rules.length > 0) {
+            json.rules = Outbound.DNSRule.toJsonArray(this.rules);
+        }
+
+        return json;
     }
 };
 Outbound.VmessSettings = class extends CommonClass {
