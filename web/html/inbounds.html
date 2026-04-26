@@ -1164,24 +1164,23 @@
         if (!msg.success) {
           return;
         }
-        with (msg.obj) {
-          this.expireDiff = expireDiff * 86400000;
-          this.trafficDiff = trafficDiff * 1073741824;
-          this.defaultCert = defaultCert;
-          this.defaultKey = defaultKey;
-          this.tgBotEnable = tgBotEnable;
-          this.subSettings = {
-            enable: subEnable,
-            subTitle: subTitle,
-            subURI: subURI,
-            subJsonURI: subJsonURI,
-            subJsonEnable: subJsonEnable,
-          };
-          this.pageSize = pageSize;
-          this.remarkModel = remarkModel;
-          this.datepicker = datepicker;
-          this.ipLimitEnable = ipLimitEnable;
-        }
+        const settings = msg.obj || {};
+        this.expireDiff = settings.expireDiff * 86400000;
+        this.trafficDiff = settings.trafficDiff * 1073741824;
+        this.defaultCert = settings.defaultCert;
+        this.defaultKey = settings.defaultKey;
+        this.tgBotEnable = settings.tgBotEnable;
+        this.subSettings = {
+          enable: settings.subEnable,
+          subTitle: settings.subTitle,
+          subURI: settings.subURI,
+          subJsonURI: settings.subJsonURI,
+          subJsonEnable: settings.subJsonEnable,
+        };
+        this.pageSize = settings.pageSize;
+        this.remarkModel = settings.remarkModel;
+        this.datepicker = settings.datepicker;
+        this.ipLimitEnable = settings.ipLimitEnable;
       },
       setInbounds(dbInbounds) {
         this.inbounds.splice(0);
