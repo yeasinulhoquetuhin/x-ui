@@ -938,19 +938,23 @@
             <template v-if="mask.type === 'header-custom'">
               <!-- Clients -->
               <a-form-item label="Clients">
-                <a-icon type="plus" @click="mask.settings.clients.push([{delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []}])" />
+                <a-button
+                  icon="plus"
+                  type="primary"
+                  size="small"
+                  @click="mask.settings.clients.push([{delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []}])"
+                ></a-button>
               </a-form-item>
               <template v-for="(group, gi) in mask.settings.clients" :key="'cg'+gi">
                 <a-divider :style="{ margin: '0' }">
                   Clients Group [[ gi + 1 ]]
-                  <a-icon type="delete" @click="mask.settings.clients.splice(gi, 1)" :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }" />
-                  <a-icon type="plus" @click="group.push({delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []})" :style="{ marginLeft: '8px' }" />
+                  <a-icon
+                    type="delete"
+                    @click="mask.settings.clients.splice(gi, 1)"
+                    :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer', marginLeft: '8px' }"
+                  ></a-icon>
                 </a-divider>
                 <template v-for="(item, ii) in group" :key="'ci'+ii">
-                  <a-divider :style="{ margin: '0', fontSize: '12px' }">
-                    Item [[ ii + 1 ]]
-                    <a-icon type="delete" @click="() => { group.splice(ii, 1); if(group.length === 0) mask.settings.clients.splice(gi, 1); }" :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }" />
-                  </a-divider>
                   <a-form-item label='{{ i18n "pages.xray.outbound.type" }}'>
                     <a-select v-model="item.type" :dropdown-class-name="themeSwitcher.currentTheme"
                       @change="t => { if(t === 'array') { item.rand = 0; item.packet = []; } else { item.packet = ''; } }">
@@ -979,19 +983,23 @@
 
               <!-- Servers -->
               <a-form-item label="Servers">
-                <a-icon type="plus" @click="mask.settings.servers.push([{delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []}])" />
+                <a-button
+                  icon="plus"
+                  type="primary"
+                  size="small"
+                  @click="mask.settings.servers.push([{delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []}])"
+                ></a-button>
               </a-form-item>
               <template v-for="(group, gi) in mask.settings.servers" :key="'sg'+gi">
                 <a-divider :style="{ margin: '0' }">
                   Servers Group [[ gi + 1 ]]
-                  <a-icon type="delete" @click="mask.settings.servers.splice(gi, 1)" :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }" />
-                  <a-icon type="plus" @click="group.push({delay: 0, rand: 0, randRange: '0-255', type: 'array', packet: []})" :style="{ marginLeft: '8px' }" />
+                  <a-icon
+                    type="delete"
+                    @click="mask.settings.servers.splice(gi, 1)"
+                    :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer', marginLeft: '8px' }"
+                  ></a-icon>
                 </a-divider>
                 <template v-for="(item, ii) in group" :key="'si'+ii">
-                  <a-divider :style="{ margin: '0', fontSize: '12px' }">
-                    Item [[ ii + 1 ]]
-                    <a-icon type="delete" @click="() => { group.splice(ii, 1); if(group.length === 0) mask.settings.servers.splice(gi, 1); }" :style="{ color: 'rgb(255, 77, 79)', cursor: 'pointer' }" />
-                  </a-divider>
                   <a-form-item label='{{ i18n "pages.xray.outbound.type" }}'>
                     <a-select v-model="item.type" :dropdown-class-name="themeSwitcher.currentTheme"
                       @change="t => { if(t === 'array') { item.rand = 0; item.packet = []; } else { item.packet = ''; } }">
@@ -1126,12 +1134,12 @@
                 <a-input-number v-model.number="mask.settings.reset" :min="0" />
               </a-form-item>
               <a-form-item label="Noise">
-                <a-icon
-                  type="plus"
+                <a-button
+                  icon="plus"
                   type="primary"
                   size="small"
                   @click="mask.settings.noise.push({rand: 0, randRange: '0-255', type: 'array', packet: [], delay: ''})"
-                />
+                ></a-button>
               </a-form-item>
               <template v-for="(n, index) in mask.settings.noise" :key="index">
                 <a-divider :style="{ margin: '0' }">
@@ -1175,11 +1183,12 @@
             </template>
             <template v-if="mask.type === 'header-custom'">
               <a-form-item label="Client">
-                <a-icon
-                  type="plus"
+                <a-button
+                  icon="plus"
+                  type="primary"
                   size="small"
                   @click="mask.settings.client.push({rand: 0, randRange: '0-255', type: 'array', packet: []})"
-                />
+                ></a-button>
               </a-form-item>
               <template v-for="(c, index) in mask.settings.client" :key="index">
                 <a-divider :style="{ margin: '0' }">
@@ -1216,11 +1225,12 @@
               </template>
               <a-divider :style="{ margin: '0' }"></a-divider>
               <a-form-item label="Server">
-                <a-icon
-                  type="plus"
+                <a-button
+                  icon="plus"
+                  type="primary"
                   size="small"
                   @click="mask.settings.server.push({rand: 0, randRange: '0-255', type: 'array', packet: []})"
-                />
+                ></a-button>
               </a-form-item>
               <template v-for="(s, index) in mask.settings.server" :key="index">
                 <a-divider :style="{ margin: '0' }">

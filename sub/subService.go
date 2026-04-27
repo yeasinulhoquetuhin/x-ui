@@ -1027,14 +1027,18 @@ type kcpShareFields struct {
 }
 
 func (f kcpShareFields) applyToParams(params map[string]string) {
-	params["headerType"] = f.headerType
+	if f.headerType != "" && f.headerType != "none" {
+		params["headerType"] = f.headerType
+	}
 	setStringParam(params, "seed", f.seed)
 	setIntParam(params, "mtu", f.mtu)
 	setIntParam(params, "tti", f.tti)
 }
 
 func (f kcpShareFields) applyToObj(obj map[string]any) {
-	obj["type"] = f.headerType
+	if f.headerType != "" && f.headerType != "none" {
+		obj["type"] = f.headerType
+	}
 	setStringField(obj, "path", f.seed)
 	setIntField(obj, "mtu", f.mtu)
 	setIntField(obj, "tti", f.tti)
