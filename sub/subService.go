@@ -997,9 +997,14 @@ var validFinalMaskUDPTypes = map[string]struct{}{
 	"mkcp-original":    {},
 	"xdns":             {},
 	"xicmp":            {},
-	"header-custom":    {},
 	"noise":            {},
-	"sudoku":           {},
+	"header-custom":    {},
+}
+
+var validFinalMaskTCPTypes = map[string]struct{}{
+	"header-custom": {},
+	"fragment":      {},
+	"sudoku":        {},
 }
 
 // applyKcpShareParams reconstructs legacy KCP share-link fields from either
@@ -1159,11 +1164,59 @@ func marshalFinalMask(finalmask map[string]any) (string, bool) {
 }
 
 func normalizeFinalMask(finalmask map[string]any) map[string]any {
+	tcpMasks := normalizedFinalMaskTCPMasks(finalmask)
 	udpMasks := normalizedFinalMaskUDPMasks(finalmask)
-	if len(udpMasks) == 0 {
+	quicParams, hasQuicParams := finalmask["quicParams"].(map[string]any)
+
+	if len(tcpMasks) == 0 && len(udpMasks) == 0 && !hasQuicParams {
 		return nil
 	}
-	return map[string]any{"udp": udpMasks}
+
+	result := map[string]any{}
+	if len(tcpMasks) > 0 {
+		result["tcp"] = tcpMasks
+	}
+	if len(udpMasks) > 0 {
+		result["udp"] = udpMasks
+	}
+	if hasQuicParams && len(quicParams) > 0 {
+		result["quicParams"] = quicParams
+	}
+	return result
+}
+
+func normalizedFinalMaskTCPMasks(value any) []any {
+	finalmask, _ := value.(map[string]any)
+	if finalmask == nil {
+		return nil
+	}
+	rawMasks, _ := finalmask["tcp"].([]any)
+	if len(rawMasks) == 0 {
+		return nil
+	}
+
+	normalized := make([]any, 0, len(rawMasks))
+	for _, rawMask := range rawMasks {
+		mask, _ := rawMask.(map[string]any)
+		if mask == nil {
+			continue
+		}
+		maskType, _ := mask["type"].(string)
+		if _, ok := validFinalMaskTCPTypes[maskType]; !ok || maskType == "" {
+			continue
+		}
+
+		normalizedMask := map[string]any{"type": maskType}
+		if settings, ok := mask["settings"].(map[string]any); ok && len(settings) > 0 {
+			normalizedMask["settings"] = settings
+		}
+		normalized = append(normalized, normalizedMask)
+	}
+
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
 }
 
 func normalizedFinalMaskUDPMasks(value any) []any {
