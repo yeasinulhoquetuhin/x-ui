@@ -860,10 +860,10 @@ update_x-ui() {
     
     chmod +x x-ui bin/xray-linux-$(arch) >/dev/null 2>&1
     
-    ${curl_bin} -fLRo /usr/bin/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.sh >/dev/null 2>&1
+    ${curl_bin} -fLRo /usr/bin/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.sh >/dev/null 2>&1
     if [[ $? -ne 0 ]]; then
         echo -e "${yellow}Trying to fetch x-ui with IPv4...${plain}"
-        ${curl_bin} -4fLRo /usr/bin/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.sh >/dev/null 2>&1
+        ${curl_bin} -4fLRo /usr/bin/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.sh >/dev/null 2>&1
         if [[ $? -ne 0 ]]; then
             _fail "ERROR: Failed to download x-ui.sh script, please be sure that your server can access GitHub"
         fi
@@ -883,9 +883,9 @@ update_x-ui() {
     
     if [[ $release == "alpine" ]]; then
         echo -e "${green}Downloading and installing startup unit x-ui.rc...${plain}"
-        ${curl_bin} -fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.rc >/dev/null 2>&1
+        ${curl_bin} -fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.rc >/dev/null 2>&1
         if [[ $? -ne 0 ]]; then
-            ${curl_bin} -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.rc >/dev/null 2>&1
+            ${curl_bin} -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.rc >/dev/null 2>&1
             if [[ $? -ne 0 ]]; then
                 _fail "ERROR: Failed to download startup unit x-ui.rc, please be sure that your server can access GitHub"
             fi
@@ -939,13 +939,13 @@ update_x-ui() {
                 echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
                 case "${release}" in
                     ubuntu | debian | armbian)
-                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.service.debian >/dev/null 2>&1
+                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.service.debian >/dev/null 2>&1
                     ;;
                     arch | manjaro | parch)
-                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.service.arch >/dev/null 2>&1
+                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.service.arch >/dev/null 2>&1
                     ;;
                     *)
-                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/9cc1a59e/x-ui.service.rhel >/dev/null 2>&1
+                        ${curl_bin} -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/c6666030/x-ui.service.rhel >/dev/null 2>&1
                     ;;
                 esac
                 
