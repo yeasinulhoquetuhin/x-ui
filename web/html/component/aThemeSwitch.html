@@ -41,7 +41,7 @@
 <script>
   function createThemeSwitcher() {
     const darkModePreference = localStorage.getItem('dark-mode');
-    const isDarkTheme = darkModePreference === null ? true : darkModePreference === 'true';
+    const isDarkTheme = darkModePreference === null ? false : darkModePreference === 'true';
     const isUltra = localStorage.getItem('isUltraDarkThemeEnabled') === 'true';
     if (isUltra) {
       document.documentElement.setAttribute('data-theme', 'ultra-dark');
