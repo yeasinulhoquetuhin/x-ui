@@ -546,6 +546,8 @@ ssl_cert_issue() {
 }
 # Unified interactive SSL setup (domain or IP)
 # Sets global `SSL_HOST` to the chosen domain/IP
+SSL_CONFIGURED=false
+
 prompt_and_setup_ssl() {
     local panel_port="$1"
     local web_base_path="$2"   # expected without leading slash
@@ -557,12 +559,13 @@ prompt_and_setup_ssl() {
     echo -e "${green}1.${plain} Let's Encrypt for Domain (90-day validity, auto-renews)"
     echo -e "${green}2.${plain} Let's Encrypt for IP Address (6-day validity, auto-renews)"
     echo -e "${green}3.${plain} Custom SSL Certificate (Path to existing files)"
+    echo -e "${green}4.${plain} Skip SSL (configure everything else without SSL)"
     echo -e "${blue}Note:${plain} Options 1 & 2 require port 80 open. Option 3 requires manual paths."
     read -rp "Choose an option (default 2 for IP): " ssl_choice
     ssl_choice="${ssl_choice// /}"  # Trim whitespace
     
-    # Default to 2 (IP cert) if input is empty or invalid (not 1 or 3)
-    if [[ "$ssl_choice" != "1" && "$ssl_choice" != "3" ]]; then
+    # Default to 2 (IP cert) if input is empty or invalid
+    if [[ "$ssl_choice" != "1" && "$ssl_choice" != "3" && "$ssl_choice" != "4" ]]; then
         ssl_choice="2"
     fi
 
@@ -680,6 +683,10 @@ prompt_and_setup_ssl() {
         echo -e "${yellow}Note: You are responsible for renewing these files externally.${plain}"
 
         systemctl restart x-ui >/dev/null 2>&1 || rc-service x-ui restart >/dev/null 2>&1
+        ;;
+    4)
+        echo -e "${yellow}Skipping SSL setup. You can configure it later via x-ui menu.${plain}"
+        SSL_HOST="${server_ip}"
         ;;
     *)
         echo -e "${red}Invalid option. Skipping SSL setup.${plain}"
