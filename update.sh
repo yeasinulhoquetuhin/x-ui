@@ -718,9 +718,9 @@ config_after_update() {
         fi
     done
     
-    # Handle missing/short webBasePath
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
+    # Handle missing/short webBasePath (skip if empty or just "/")
+    if [[ -n "$existing_webBasePath" && "$existing_webBasePath" != "/" && ${#existing_webBasePath} -lt 4 ]]; then
+        echo -e "${yellow}WebBasePath is too short. Generating a new one...${plain}"
         local config_webBasePath=$(gen_random_string 18)
         ${xui_folder}/x-ui setting -webBasePath "${config_webBasePath}"
         existing_webBasePath="${config_webBasePath}"
