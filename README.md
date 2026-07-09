@@ -36,14 +36,14 @@ The installer auto-detects your architecture and handles IP limit config, SSL sk
 
 ## ◈ Architecture Support
 
-| Architecture | Binary |
-|---|---|
-| x86_64 / amd64 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-amd64.tar.gz) |
-| ARM64 / aarch64 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-arm64.tar.gz) |
-| ARMv7 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv7.tar.gz) |
-| ARMv6 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv6.tar.gz) |
-| ARMv5 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv5.tar.gz) |
-| IBM S390x | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-s390x.tar.gz) |
+| Architecture | File | Download |
+|---|---|---|
+| **x86_64 / amd64** | `x-ui-linux-amd64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-amd64.tar.gz) |
+| **ARM64 / aarch64** | `x-ui-linux-arm64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-arm64.tar.gz) |
+| **ARMv7** | `x-ui-linux-armv7.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv7.tar.gz) |
+| **ARMv6** | `x-ui-linux-armv6.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv6.tar.gz) |
+| **ARMv5** | `x-ui-linux-armv5.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv5.tar.gz) |
+| **IBM S390x** | `x-ui-linux-s390x.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-s390x.tar.gz) |
 
 > No compilation needed — every release ships pre-built binaries for all 6 architectures.
 
@@ -106,6 +106,7 @@ No manual config needed — the installer sets everything up automatically.
 > *Patched and maintained by **Yeasinul Hoque Tuhin***
 
 **Project Page:** [tuhinbro.com/project/x-ui-mod](https://tuhinbro.com/project/x-ui-mod)
+
 ---
 
 <p align="center">
