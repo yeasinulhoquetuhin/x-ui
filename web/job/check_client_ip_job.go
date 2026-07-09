@@ -431,6 +431,24 @@ func (j *CheckClientIpJob) updateInboundClientIps(inboundClientIps *model.Inboun
 	// only store live ips so the panel shows only currently connected clients
 	dbIps := make([]IPWithTimestamp, 0, len(keptLive))
 	dbIps = append(dbIps, keptLive...)
+	
+	// If no live ips but we have historical entries, keep the historical ones
+	// so the panel doesn't show 0/1 for connected clients between scans.
+	if len(keptLive) == 0 {
+		oldIps := []IPWithTimestamp{}
+		if inboundClientIps.Ips != "" {
+			json.Unmarshal([]byte(inboundClientIps.Ips), &oldIps)
+		}
+		for _, oldIp := range oldIps {
+			if oldIp.Timestamp >= time.Now().Unix()-ipStaleAfterSeconds {
+				dbIps = append(dbIps, oldIp)
+			}
+		}
+		if len(dbIps) == 0 {
+			dbIps = oldIps
+		}
+	}
+	
 	jsonIps, _ := json.Marshal(dbIps)
 	inboundClientIps.Ips = string(jsonIps)
 
