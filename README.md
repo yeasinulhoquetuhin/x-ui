@@ -2,7 +2,7 @@
   <img src="https://github.com/yeasinulhoquetuhin/x-ui/raw/master/media/3x-ui-light.png" alt="3X-UI Logo" width="200"/>
 </p>
 
-<h1 align="center">TDZ X-UI v2.9.3 <sup>Patched • Beta</sup></h1>
+<h1 align="center">3X-UI v2.9.3 MOD</sup></h1>
 
 <p align="center">
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched">
