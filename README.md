@@ -1,57 +1,111 @@
-[English](/README.md) | [فارسی](/README.fa_IR.md) | [العربية](/README.ar_EG.md) | [中文](/README.zh_CN.md) | [Español](/README.es_ES.md) | [Русский](/README.ru_RU.md)
-
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./media/3x-ui-dark.png">
-    <img alt="3x-ui" src="./media/3x-ui-light.png">
-  </picture>
+  <img src="https://github.com/yeasinulhoquetuhin/x-ui/raw/master/media/3x-ui-light.png" alt="3X-UI Logo" width="200"/>
 </p>
 
-[![Release](https://img.shields.io/github/v/release/mhsanaei/3x-ui.svg)](https://github.com/MHSanaei/3x-ui/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/mhsanaei/3x-ui/release.yml.svg)](https://github.com/MHSanaei/3x-ui/actions)
-[![GO Version](https://img.shields.io/github/go-mod/go-version/mhsanaei/3x-ui.svg)](#)
-[![Downloads](https://img.shields.io/github/downloads/mhsanaei/3x-ui/total.svg)](https://github.com/MHSanaei/3x-ui/releases/latest)
-[![License](https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true)](https://www.gnu.org/licenses/gpl-3.0.en.html)
-[![Go Reference](https://pkg.go.dev/badge/github.com/mhsanaei/3x-ui/v2.svg)](https://pkg.go.dev/github.com/mhsanaei/3x-ui/v2)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mhsanaei/3x-ui/v2)](https://goreportcard.com/report/github.com/mhsanaei/3x-ui/v2)
+<h1 align="center">TDZ X-UI v2.9.3 <sup>Patched • Beta</sup></h1>
 
-**3X-UI** — advanced, open-source web-based control panel designed for managing Xray-core server. It offers a user-friendly interface for configuring and monitoring various VPN and proxy protocols.
+<p align="center">
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched">
+    <img src="https://img.shields.io/github/v/release/yeasinulhoquetuhin/x-ui?color=blue&label=release&style=for-the-badge" alt="Release">
+  </a>
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/yeasinulhoquetuhin/x-ui?color=green&style=for-the-badge" alt="License">
+  </a>
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui/commits/master">
+    <img src="https://img.shields.io/github/last-commit/yeasinulhoquetuhin/x-ui?style=for-the-badge" alt="Last Commit">
+  </a>
+  <img src="https://img.shields.io/badge/arch-6_supported-orange?style=for-the-badge" alt="Architectures">
+</p>
 
-> [!IMPORTANT]
-> This project is only for personal usage, please do not use it for illegal purposes, and please do not use it in a production environment.
+---
 
-As an enhanced fork of the original X-UI project, 3X-UI provides improved stability, broader protocol support, and additional features.
-
-## Quick Start
+## Quick Install
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh)
 ```
 
-For full documentation, please visit the [project Wiki](https://github.com/MHSanaei/3x-ui/wiki).
+The installer auto-detects your architecture and handles IP limit config, SSL skip option, fail2ban setup, and more.
 
-## A Special Thanks to
+---
 
-- [alireza0](https://github.com/alireza0/)
+## Architecture Support
 
-## Acknowledgment
+| Architecture | Binary |
+|---|---|
+| x86_64 / amd64 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-amd64.tar.gz) |
+| ARM64 / aarch64 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-arm64.tar.gz) |
+| ARMv7 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv7.tar.gz) |
+| ARMv6 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv6.tar.gz) |
+| ARMv5 | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv5.tar.gz) |
+| IBM S390x | [Download](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-s390x.tar.gz) |
 
-- [Iran v2ray rules](https://github.com/chocolate4u/Iran-v2ray-rules) (License: **GPL-3.0**): _Enhanced v2ray/xray and v2ray/xray-clients routing rules with built-in Iranian domains and a focus on security and adblocking._
-- [Russia v2ray rules](https://github.com/runetfreedom/russia-v2ray-rules-dat) (License: **GPL-3.0**): _This repository contains automatically updated V2Ray routing rules based on data on blocked domains and addresses in Russia._
+> No compilation needed — every release ships pre-built binaries for all 6 architectures.
 
-## Support project
+---
 
-**If this project is helpful to you, you may wish to give it a**:star2:
+## Features
 
-<a href="https://www.buymeacoffee.com/MHSanaei" target="_blank">
-<img src="./media/default-yellow.png" alt="Buy Me A Coffee" style="height: 70px !important;width: 277px !important;" >
-</a>
+| # | Feature | Status |
+|---|---|---|
+| 1 | IP Limit via access log — auto-configured on install/update | Done |
+| 2 | SSL Skip option (option 4) during install & update | Done |
+| 3 | Default theme changed from black to light | Done |
+| 4 | Fail2ban auto-setup with 3x-ipl jail | Done |
+| 5 | Telegram Bot — full support, no webhook errors | Done |
+| 6 | SSL works with domain & IP certificates — Let's Encrypt auto-renew | Done |
+| 7 | WebBasePath preserved during updates — no unwanted changes | Done |
+| 8 | Rate-limit safe downloads — SHA-based URLs, no GitHub API dependency | Done |
+| 9 | Pre-built for all architectures — zero compilation needed | Done |
+| 10 | 0/1 IP count flicker fixed — historical IPs retained between scans | Done |
 
-</br>
-<a href="https://nowpayments.io/donation/hsanaei" target="_blank" rel="noreferrer noopener">
-   <img src="./media/donation-button-black.svg" alt="Crypto donation button by NOWPayments">
-</a>
+---
 
-## Stargazers over Time
+## IP Limit
 
-[![Stargazers over time](https://starchart.cc/MHSanaei/3x-ui.svg?variant=adaptive)](https://starchart.cc/MHSanaei/3x-ui)
+The IP limit feature uses a persistent access log that:
+1. Accumulates client IPs across scan intervals
+2. Merges historical IPs with a 30-minute stale cutoff — no flickering
+3. Falls back gracefully when gRPC GetOnlineUsers is unavailable
+
+No manual config needed — the installer sets everything up automatically.
+
+---
+
+## Changelog (v2.9.3-patched)
+
+- IP Limit — Fully functional with access log enabled; persistent log prevents 0/1 flicker
+- SSL Skip — Bypass SSL setup during install or update with option 4
+- Light Theme — Default panel theme switched to light mode
+- Fail2ban — Automatically configured with optimized 3x-ipl jail rules
+- Telegram Bot — Stable webhook integration, zero errors
+- SSL Auto-Renew — Let's Encrypt certificates renew for both domain and IP-based setups
+- WebBasePath — Unchanged during updates, preserving your custom path
+- Rate-Limiting — Downloads use SHA-based asset URLs, avoiding GitHub API rate limits
+- Multi-Arch — 6 architectures pre-built, no server-side compilation required
+- IP Flicker Fix — Historical IPs are retained between scans, eliminating 0/1 count oscillation
+
+---
+
+## Credits
+
+```
+Thanks to: Yeasinul Hoque Tuhin
+```
+
+Project page: [https://tuhinbro.com/project/x-ui-mod](https://tuhinbro.com/project/x-ui-mod)
+
+---
+
+<p align="center">
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui">
+    <img src="https://img.shields.io/github/stars/yeasinulhoquetuhin/x-ui?style=social" alt="Stars">
+  </a>
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui/fork">
+    <img src="https://img.shields.io/github/forks/yeasinulhoquetuhin/x-ui?style=social" alt="Forks">
+  </a>
+</p>
+
+<p align="center">
+  <sub>Built for the community</sub>
+</p>
