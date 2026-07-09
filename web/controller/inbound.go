@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v2/database/model"
+	"github.com/mhsanaei/3x-ui/v2/web/job"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 	"github.com/mhsanaei/3x-ui/v2/web/websocket"
@@ -194,6 +195,8 @@ func (a *InboundController) updateInbound(c *gin.Context) {
 // getClientIps retrieves the IP addresses associated with a client by email.
 func (a *InboundController) getClientIps(c *gin.Context) {
 	email := c.Param("email")
+
+	job.NewCheckClientIpJob().Run()
 
 	ips, err := a.inboundService.GetInboundClientIps(email)
 	if err != nil || ips == "" {

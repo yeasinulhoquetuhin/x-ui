@@ -244,29 +244,36 @@
         <tr v-if="app.ipLimitEnable">
           <td>{{ i18n "pages.inbounds.IPLimit" }}</td>
           <td>
-            <a-tag>[[ infoModal.clientSettings.limitIp ]]</a-tag>
+            <a-tag v-if="infoModal.clientSettings.limitIp > 0"
+              :color="getActiveIpCount() >= infoModal.clientSettings.limitIp ? 'red' : 'green'">
+              [[ getActiveIpCount() ]] / [[ infoModal.clientSettings.limitIp ]]
+            </a-tag>
+            <a-tag v-else>0</a-tag>
           </td>
         </tr>
         <tr v-if="app.ipLimitEnable && infoModal.clientSettings.limitIp > 0">
           <td>{{ i18n "pages.inbounds.IPLimitlog" }}</td>
           <td>
-            <div style="max-height: 150px; overflow-y: auto; text-align: left;">
-              <div v-if="infoModal.clientIpsArray && infoModal.clientIpsArray.length > 0">
-                <a-tag v-for="(ipInfo, idx) in infoModal.clientIpsArray" :key="idx" color="blue"
-                  style="margin: 2px 0; display: block; font-family: monospace; font-size: 11px;">
-                  [[ formatIpInfo(ipInfo) ]]
-                </a-tag>
-              </div>
-              <a-tag v-else>[[ infoModal.clientIps || 'No IP Record'
-                ]]</a-tag>
+            <div style="max-height: 150px; min-height: 32px; overflow-y: auto; text-align: left; padding: 4px 0;">
+              <a-spin :spinning="loadingIps" size="small">
+                <div v-if="infoModal.clientIpsArray && infoModal.clientIpsArray.length > 0">
+                  <transition-group name="ip-fade">
+                    <a-tag v-for="(ipInfo, idx) in infoModal.clientIpsArray" :key="idx" color="blue"
+                      style="margin: 2px 0; display: block; font-family: monospace; font-size: 11px;">
+                      [[ formatIpInfo(ipInfo) ]]
+                    </a-tag>
+                  </transition-group>
+                </div>
+                <a-tag v-else style="display: inline-block;">[[ infoModal.clientIps || 'No IP Record' ]]</a-tag>
+              </a-spin>
             </div>
             <div style="margin-top: 5px;">
-              <a-icon type="sync" :spin="refreshing" @click="refreshIPs" :style="{ margin: '0 5px' }"></a-icon>
+              <a-icon type="sync" :spin="refreshing" @click="refreshIPs" :style="{ margin: '0 5px', cursor: 'pointer' }"></a-icon>
               <a-tooltip>
                 <template slot="title">
                   <span>{{ i18n "pages.inbounds.IPLimitlogclear" }}</span>
                 </template>
-                <a-icon type="delete" @click="clearClientIps"></a-icon>
+                <a-icon type="delete" @click="clearClientIps" style="cursor: pointer;"></a-icon>
               </a-tooltip>
             </div>
           </td>
@@ -637,9 +644,12 @@
         ].includes(this.inbound.protocol)
       ) {
         if (app.ipLimitEnable && this.clientSettings.limitIp) {
+          this.loadingIps = true;
           refreshIPs(this.clientStats.email).then((result) => {
             this.clientIps = result.text;
             this.clientIpsArray = result.array;
+          }).finally(() => {
+            this.loadingIps = false;
           })
         }
       }
@@ -668,12 +678,16 @@
       return app.subSettings.subJsonURI + subID;
     }
   };
+  // IP fade transition for smooth list updates
+  document.head.insertAdjacentHTML('beforeend', '<style>.ip-fade-enter-active,.ip-fade-leave-active{transition:all .3s ease}.ip-fade-enter,.ip-fade-leave-to{opacity:0;transform:translateY(-6px)}</style>');
+
   const infoModalApp = new Vue({
     delimiters: ['[[', ']]'],
     el: '#inbound-info-modal',
     data: {
       infoModal,
       refreshing: false,
+      loadingIps: false,
       get dbInbound() {
         return this.infoModal.dbInbound;
       },
@@ -712,6 +726,14 @@
       },
     },
     methods: {
+      getActiveIpCount() {
+        if (!this.infoModal.clientIpsArray || !Array.isArray(this.infoModal.clientIpsArray)) {
+          return 0;
+        }
+        return this.infoModal.clientIpsArray.filter(function(ip) {
+          return ip && ip !== 'No IP Record' && ip !== 'Error loading IPs';
+        }).length;
+      },
       formatIpInfo(ipInfo) {
         if (ipInfo == null) {
           return '';
@@ -757,6 +779,7 @@
       },
       refreshIPs() {
         this.refreshing = true;
+        this.loadingIps = true;
         refreshIPs(this.infoModal.clientStats.email)
           .then((result) => {
             this.infoModal.clientIps = result.text;
@@ -764,6 +787,7 @@
           })
           .finally(() => {
             this.refreshing = false;
+            this.loadingIps = false;
           });
       },
       clearClientIps() {
