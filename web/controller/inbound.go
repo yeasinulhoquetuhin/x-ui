@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v2/database/model"
-	"github.com/mhsanaei/3x-ui/v2/web/job"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 	"github.com/mhsanaei/3x-ui/v2/web/websocket"
@@ -196,11 +195,18 @@ func (a *InboundController) updateInbound(c *gin.Context) {
 func (a *InboundController) getClientIps(c *gin.Context) {
 	email := c.Param("email")
 
-	job.NewCheckClientIpJob().Run()
+	if err := a.inboundService.RefreshClientIPs(); err != nil {
+		jsonObj(c, nil, err)
+		return
+	}
 
 	ips, err := a.inboundService.GetInboundClientIps(email)
 	if err != nil || ips == "" {
 		jsonObj(c, "No IP Record", nil)
+		return
+	}
+	if ips == "[]" || ips == "null" {
+		jsonObj(c, []string{}, nil)
 		return
 	}
 

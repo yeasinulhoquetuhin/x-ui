@@ -88,3 +88,46 @@ func equalJSON(t *testing.T, a, b string) bool {
 	jb, _ := json.Marshal(vb)
 	return string(ja) == string(jb)
 }
+
+func TestTrackingConfigRepairsLegacyPathAndPreservesSettings(t *testing.T) {
+	for _, path := range []string{"/var/log/xray/access.log", "./access.log", "/custom/access.log", "none"} {
+		t.Run(path, func(t *testing.T) {
+			raw := `{"log":{"access":"` + path + `","error":"./errors.log","loglevel":"debug"},"policy":{"levels":{"0":{"connIdle":90},"3":{"statsUserUplink":true}},"system":{"statsInboundUplink":true}},"api":{"tag":"api","services":["HandlerService"]},"routing":{"rules":[{"type":"field","port":"53","outboundTag":"dns"}]}}`
+			got, err := normalizeXrayTrackingConfig(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var cfg struct {
+				Log    map[string]any `json:"log"`
+				Policy struct {
+					Levels map[string]map[string]any `json:"levels"`
+					System map[string]any            `json:"system"`
+				} `json:"policy"`
+				API struct {
+					Services []string `json:"services"`
+				} `json:"api"`
+				Routing json.RawMessage `json:"routing"`
+			}
+			if err := json.Unmarshal([]byte(got), &cfg); err != nil {
+				t.Fatal(err)
+			}
+			want := path
+			if path == "/var/log/xray/access.log" {
+				want = "./access.log"
+			}
+			if cfg.Log["access"] != want || cfg.Log["error"] != "./errors.log" || cfg.Log["loglevel"] != "debug" {
+				t.Fatalf("logging damaged: %s", got)
+			}
+			if cfg.Policy.Levels["0"]["connIdle"] != float64(90) || cfg.Policy.Levels["3"]["statsUserOnline"] != true || cfg.Policy.System["statsInboundUplink"] != true {
+				t.Fatalf("policy damaged: %s", got)
+			}
+			if len(cfg.API.Services) != 2 || !equalJSON(t, string(cfg.Routing), `{"rules":[{"type":"field","port":"53","outboundTag":"dns"}]}`) {
+				t.Fatalf("custom config lost: %s", got)
+			}
+			second, err := normalizeXrayTrackingConfig(got)
+			if err != nil || second != got {
+				t.Fatal("configuration repair is not idempotent")
+			}
+		})
+	}
+}

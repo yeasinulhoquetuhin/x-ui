@@ -8,6 +8,10 @@ ARG TARGETARCH
 RUN apk --no-cache --update add \
   build-base \
   gcc \
+  git \
+  python3 \
+  bash \
+  coreutils \
   curl \
   unzip
 

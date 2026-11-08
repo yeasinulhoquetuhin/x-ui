@@ -308,7 +308,7 @@ func (s *Server) startTask() {
 	// Check if xray needs to be restarted every 30 seconds
 	s.cron.AddFunc("@every 30s", func() {
 		if s.xrayService.IsNeedRestartAndSetFalse() {
-			err := s.xrayService.RestartXray(false)
+			err := s.xrayService.RestartXray(true)
 			if err != nil {
 				logger.Error("restart xray failed:", err)
 			}
@@ -321,8 +321,8 @@ func (s *Server) startTask() {
 		s.cron.AddJob("@every 10s", job.NewXrayTrafficJob())
 	}()
 
-	// check client ips from log file every 10 sec
-	s.cron.AddJob("@every 10s", job.NewCheckClientIpJob())
+	// Refresh live IPs and publish edited limits; core admission is immediate.
+	s.cron.AddJob("@every 2s", job.NewCheckClientIpJob())
 
 	// check client ips from log file every day
 	s.cron.AddJob("@daily", job.NewClearLogsJob())
@@ -336,6 +336,9 @@ func (s *Server) startTask() {
 	s.cron.AddJob("@weekly", job.NewPeriodicTrafficResetJob("weekly"))
 	// Run once a month, midnight, first of month
 	s.cron.AddJob("@monthly", job.NewPeriodicTrafficResetJob("monthly"))
+	clientResetJob := job.NewClientTrafficResetJob()
+	clientResetJob.Run()
+	s.cron.AddJob("@every 1m", clientResetJob)
 
 	// LDAP sync scheduling
 	if ldapEnabled, _ := s.settingService.GetLdapEnable(); ldapEnabled {

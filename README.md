@@ -3,10 +3,10 @@
 </p>
 
 <h1 align="center">TDZ X-UI</h1>
-<p align="center"><b>3X-UI v2.9.3 — Patched • Beta</b></p>
+<p align="center"><b>3X-UI v2.9.3-patched.1</b></p>
 
 <p align="center">
-  <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched">
+  <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/latest">
     <img src="https://img.shields.io/github/v/release/yeasinulhoquetuhin/x-ui?color=blue&label=release&style=for-the-badge" alt="Release">
   </a>
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/blob/master/LICENSE">
@@ -15,11 +15,11 @@
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/commits/master">
     <img src="https://img.shields.io/github/last-commit/yeasinulhoquetuhin/x-ui?style=for-the-badge" alt="Last Commit">
   </a>
-  <img src="https://img.shields.io/badge/arch-6_supported-orange?style=for-the-badge" alt="Architectures">
+  <img src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-orange?style=for-the-badge" alt="Architectures">
 </p>
 
 <p align="center">
-  A modded version of <b>3x-ui v2.9.3</b> with working IP Limit, a stable Telegram Bot, auto SSL, fail2ban integration, and a refreshed light theme — built for real-world VPN panel management.
+  A modded version of <b>3x-ui v2.9.3</b> with native per-client IP limits, live IP reporting, automatic client traffic resets, settings-preserving updates, and a refreshed light theme.
 </p>
 
 ---
@@ -30,7 +30,7 @@
 bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh)
 ```
 
-The installer auto-detects your architecture and handles IP limit config, SSL skip option, fail2ban setup, and more — no manual steps required.
+The installer auto-detects your architecture. Re-running it updates the application while preserving existing SSL, credentials, panel path, port, database and local certificates. Native IP limits use the patched core included in the release.
 
 ---
 
@@ -38,14 +38,11 @@ The installer auto-detects your architecture and handles IP limit config, SSL sk
 
 | Architecture | File | Download |
 |---|---|---|
-| **x86_64 / amd64** | `x-ui-linux-amd64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-amd64.tar.gz) |
-| **ARM64 / aarch64** | `x-ui-linux-arm64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-arm64.tar.gz) |
-| **ARMv7** | `x-ui-linux-armv7.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv7.tar.gz) |
-| **ARMv6** | `x-ui-linux-armv6.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv6.tar.gz) |
-| **ARMv5** | `x-ui-linux-armv5.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-armv5.tar.gz) |
-| **IBM S390x** | `x-ui-linux-s390x.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/download/v2.9.3-patched/x-ui-linux-s390x.tar.gz) |
+| **x86_64 / amd64** | `x-ui-linux-amd64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/x-ui-linux-amd64.tar.gz) |
+| **ARM64 / aarch64** | `x-ui-linux-arm64.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/x-ui-linux-arm64.tar.gz) |
+| **Source** | `x-ui-mod-source.tar.gz` | [**Download**](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/x-ui-mod-source.tar.gz) |
 
-> No compilation needed — every release ships pre-built binaries for all 6 architectures.
+> Both Linux packages contain the matching patched Xray core. Check `SHA256SUMS` from the same release.
 
 ---
 
@@ -55,49 +52,57 @@ This isn't just a re-upload — it's a **patched fork** with real fixes and new 
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | IP Limit via access log — auto-configured on install/update | ✅ Done |
-| 2 | SSL Skip option (option 4) during install & update | ✅ Done |
+| 1 | Native per-client IP admission limits, including concurrent streams and MUX | ✅ Done |
+| 2 | SSL Skip option (option 4) for fresh installs; existing SSL preserved | ✅ Done |
 | 3 | Default theme changed from black to light | ✅ Done |
-| 4 | Fail2ban auto-setup with 3x-ipl jail | ✅ Done |
+| 4 | Live IP reporting from core connection statistics | ✅ Done |
 | 5 | Telegram Bot — full support, no webhook errors | ✅ Done |
 | 6 | SSL works with domain & IP certificates — Let's Encrypt auto-renew | ✅ Done |
 | 7 | WebBasePath preserved during updates — no unwanted changes | ✅ Done |
-| 8 | Rate-limit safe downloads — SHA-based URLs, no GitHub API dependency | ✅ Done |
-| 9 | Pre-built for all architectures — zero compilation needed | ✅ Done |
-| 10 | 0/1 IP count flicker fixed — historical IPs retained between scans | ✅ Done |
+| 8 | Credentials changes invalidate existing panel sessions and WebSockets | ✅ Done |
+| 9 | Pre-built amd64 and arm64 packages with saved matching source | ✅ Done |
+| 10 | Per-client daily, weekly, monthly and custom-day auto traffic reset | ✅ Done |
 
 ---
 
 ## ◈ IP Limit — How It Works
 
-The IP limit feature uses a persistent access log that:
+The bundled core reserves an IP slot **before routing a client's authenticated stream**:
 
-1. Accumulates client IPs across scan intervals
-2. Merges historical IPs with a 30-minute stale cutoff — no flickering
-3. Falls back gracefully when gRPC `GetOnlineUsers` is unavailable
+1. Concurrent connections from one source IP share one slot.
+2. A new source IP is rejected while all configured slots are occupied.
+3. Closing the final stream releases its slot, including long-lived and MUX streams.
+4. Refreshing the IP list queries open connections through the core stats API; disconnected historical IPs are removed.
 
-No manual config needed — the installer sets everything up automatically.
+Install/update packages and core/GeoIP/GeoSite downloads use this repository's releases. The original Go module namespace is kept for local import compatibility.
 
-> **Troubleshooting:** If the IP Limit option is not showing up in the panel, go to **Panel Settings → Xray Configs → Access Log**, and set it to:
-> ```
-> ./access.log
-> ```
-> This enables the access log required for IP tracking to function.
+The default access-log path is `./access.log`. Native IP limiting and live reporting also work when access logging is disabled. Install the matching TDZ core; a stock core does not contain the admission limiter.
+
+IP limits count source addresses visible to Xray. A shared public IP consumes one slot. Reverse proxies/CDNs must forward the real client address using a trusted configuration or PROXY protocol.
+
+## ◈ Automatic Client Traffic Reset
+
+Choose **Auto Traffic Reset → Daily / Weekly / Monthly / Custom days** in the client editor. The schedule resets used traffic while preserving the total quota, expiry and all-time usage. Monthly cycles are anchored to activation time, and delayed-start clients begin their cycle on first use.
+
+For a six-month account with a 100 GB monthly allowance: set expiry six months ahead, Total Traffic to 100 GB and Auto Traffic Reset to Monthly. Leave account auto-renewal disabled if access must end after those six months.
 
 ---
 
-## ◈ Changelog (v2.9.3-patched)
+## ◈ Changelog (v2.9.3-patched.1)
 
-- **IP Limit** — Fully functional with access log enabled; persistent log prevents 0/1 flicker
+- **IP Limit** — Atomic admission checks inside the bundled Xray core
 - **SSL Skip** — Bypass SSL setup during install or update with option 4
 - **Light Theme** — Default panel theme switched to light mode
-- **Fail2ban** — Automatically configured with optimized 3x-ipl jail rules
+- **Live IPs** — Core connection statistics replace access-log history
 - **Telegram Bot** — Stable webhook integration, zero errors
 - **SSL Auto-Renew** — Let's Encrypt certificates renew for both domain and IP-based setups
 - **WebBasePath** — Unchanged during updates, preserving your custom path
-- **Rate-Limiting** — Downloads use SHA-based asset URLs, avoiding GitHub API rate limits
-- **Multi-Arch** — 6 architectures pre-built, no server-side compilation required
-- **IP Flicker Fix** — Historical IPs are retained between scans, eliminating 0/1 count oscillation
+- **Sessions** — Credential changes log out existing panel sessions
+- **Multi-Arch** — amd64 and arm64 packages with bundled core source, patches and tests
+- **Traffic Reset** — Per-client daily, weekly, monthly or custom-day schedules
+- **Reinstall** — Existing settings preserved with migration rollback backup
+
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for verification coverage and usage details.
 
 ---
 

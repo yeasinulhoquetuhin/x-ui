@@ -8,8 +8,20 @@ plain='\033[0m'
 
 cur_dir=$(pwd)
 
+# Match the service's configured database location during an in-place update.
+if [[ -f "${XUI_ENV_FILE:-/etc/default/x-ui}" ]]; then
+    set -a
+    source "${XUI_ENV_FILE:-/etc/default/x-ui}"
+    set +a
+fi
+
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
+xui_cli="${XUI_CLI_PATH:-/usr/bin/x-ui}"
+xui_existing_install=false
+if [[ -s "${XUI_DB_FOLDER:-/etc/x-ui}/x-ui.db" || -x "${xui_folder}/x-ui" ]]; then
+    xui_existing_install=true
+fi
 
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
@@ -74,6 +86,9 @@ is_port_in_use() {
 }
 
 install_base() {
+    if [[ "$xui_existing_install" == true ]] && command -v curl >/dev/null && command -v tar >/dev/null && command -v openssl >/dev/null; then
+        return 0
+    fi
     case "${release}" in
         ubuntu | debian | armbian)
             apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
@@ -667,6 +682,11 @@ prompt_and_setup_ssl() {
 }
 
 config_after_install() {
+    if [[ "$xui_existing_install" == true ]]; then
+        echo -e "${green}Existing installation detected. Preserving panel settings, credentials and SSL.${plain}"
+        "${xui_folder}/x-ui" migrate || return 1
+        return 0
+    fi
     local existing_hasDefaultCredential=$(${xui_folder}/x-ui setting -show true | grep -Eo 'hasDefaultCredential: .+' | awk '{print $2}')
     local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | sed 's#^/##')
     local existing_port=$(${xui_folder}/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
@@ -794,7 +814,8 @@ config_after_install() {
 }
 
 install_x-ui() {
-    cd ${xui_folder%/x-ui}/
+    mkdir -p "$(dirname "$xui_folder")" || return 1
+    cd "$(dirname "$xui_folder")" || return 1
     
     # Download resources
     if [ $# == 0 ]; then
@@ -808,7 +829,7 @@ install_x-ui() {
             fi
         fi
         echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+        curl -fLRo "${xui_folder}-linux-$(arch).tar.gz" "https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
             exit 1
@@ -825,33 +846,47 @@ install_x-ui() {
         
         url="https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
         echo -e "Beginning to install x-ui $1"
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz ${url}
+        curl -fLRo "${xui_folder}-linux-$(arch).tar.gz" "$url"
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
             exit 1
         fi
     fi
-    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/2eeb22c8/x-ui.sh
-    if [[ $? -ne 0 ]]; then
-        echo -e "${red}Failed to download x-ui.sh${plain}"
-        exit 1
+    # Validate and stage the download before stopping the existing panel.
+    local stage
+    stage=$(mktemp -d "${xui_folder}.stage.XXXXXX") || return 1
+    if ! tar xzf "${xui_folder}-linux-$(arch).tar.gz" -C "$stage" || [[ ! -f "$stage/x-ui/x-ui" || ! -f "$stage/x-ui/x-ui.sh" ]]; then
+        rm -rf -- "$stage"
+        echo -e "${red}Invalid release archive; installation aborted.${plain}"
+        return 1
     fi
-    
-    # Stop x-ui service and remove old resources
+
+    # Keep a rollback copy of the application and database before migration.
+    local backup="" db_folder="${XUI_DB_FOLDER:-/etc/x-ui}"
     if [[ -e ${xui_folder}/ ]]; then
         if [[ $release == "alpine" ]]; then
             rc-service x-ui stop
         else
             systemctl stop x-ui
         fi
-        rm ${xui_folder}/ -rf
+        backup=$(mktemp -d "${xui_folder}.backup.XXXXXX") || return 1
+        cp -a "$xui_folder" "$backup/application" || return 1
+        if [[ -d "$db_folder" ]]; then
+            cp -a "$db_folder" "$backup/database" || return 1
+        fi
+        echo "Rollback backup: $backup"
     fi
     
     # Extract resources and set permissions
-    tar zxvf x-ui-linux-$(arch).tar.gz
-    rm x-ui-linux-$(arch).tar.gz -f
+    mkdir -p "$xui_folder" || return 1
+    if ! cp -a "$stage/x-ui/." "$xui_folder/"; then
+        [[ -n "$backup" ]] && cp -a "$backup/application/." "$xui_folder/"
+        return 1
+    fi
+    rm -rf -- "$stage"
+    rm -f -- "${xui_folder}-linux-$(arch).tar.gz"
     
-    cd x-ui
+    cd "$xui_folder" || return 1
     chmod +x x-ui
     chmod +x x-ui.sh
     
@@ -860,13 +895,23 @@ install_x-ui() {
         mv bin/xray-linux-$(arch) bin/xray-linux-arm
         chmod +x bin/xray-linux-arm
     fi
-    chmod +x x-ui bin/xray-linux-$(arch)
+    chmod +x x-ui
+    if [[ -f "bin/xray-linux-$(arch)" ]]; then
+        chmod +x "bin/xray-linux-$(arch)"
+    fi
     
     # Update x-ui cli and se set permission
-    mv -f /usr/bin/x-ui-temp /usr/bin/x-ui
-    chmod +x /usr/bin/x-ui
-    mkdir -p /var/log/x-ui
-    config_after_install
+    install -m 755 "$xui_folder/x-ui.sh" "$xui_cli" || return 1
+    mkdir -p "${XUI_LOG_FOLDER:-/var/log/x-ui}"
+    if ! config_after_install; then
+        if [[ -n "$backup" ]]; then
+            cp -a "$backup/application/." "$xui_folder/"
+            [[ -d "$backup/database" ]] && cp -a "$backup/database/." "$db_folder/"
+            install -m 755 "$xui_folder/x-ui.sh" "$xui_cli"
+            if [[ "$release" == alpine ]]; then rc-service x-ui start; else systemctl start x-ui; fi
+        fi
+        return 1
+    fi
 
     # Etckeeper compatibility
     if [ -d "/etc/.git" ]; then
@@ -883,7 +928,9 @@ install_x-ui() {
     fi
     
     if [[ $release == "alpine" ]]; then
-        curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/2eeb22c8/x-ui.rc
+        if [[ ! -f /etc/init.d/x-ui ]]; then
+            curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.rc || return 1
+        fi
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Failed to download x-ui.rc${plain}"
             exit 1
@@ -895,7 +942,9 @@ install_x-ui() {
         # Install systemd service file
         service_installed=false
         
-        if [ -f "x-ui.service" ]; then
+        if [[ -f "${xui_service}/x-ui.service" ]]; then
+            service_installed=true
+        elif [ -f "x-ui.service" ]; then
             echo -e "${green}Found x-ui.service in extracted files, installing...${plain}"
             cp -f x-ui.service ${xui_service}/ >/dev/null 2>&1
             if [[ $? -eq 0 ]]; then
@@ -940,13 +989,13 @@ install_x-ui() {
             echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
             case "${release}" in
                 ubuntu | debian | armbian)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/2eeb22c8/x-ui.service.debian >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.service.debian >/dev/null 2>&1
                 ;;
                 arch | manjaro | parch)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/2eeb22c8/x-ui.service.arch >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.service.arch >/dev/null 2>&1
                 ;;
                 *)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/2eeb22c8/x-ui.service.rhel >/dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.service.rhel >/dev/null 2>&1
                 ;;
             esac
             
@@ -992,6 +1041,7 @@ install_x-ui() {
 └───────────────────────────────────────────────────────┘"
 }
 
-echo -e "${green}Running...${plain}"
-install_base
-install_x-ui $1
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    echo -e "${green}Running...${plain}"
+    install_base && install_x-ui "$@"
+fi

@@ -49,7 +49,7 @@
                 if (this.clients[index].expiryTime < 0) {
                     this.delayedStart = true;
                 }
-                this.oldClientId = this.getClientId(dbInbound.protocol, clients[index]);
+                this.oldClientId = this.getClientId(dbInbound.protocol, this.clients[index]);
             } else {
                 this.addClient(this.inbound, this.clients);
             }
@@ -141,7 +141,7 @@
                         console.error('Error parsing JSON:', e);
                     }
                 }
-                document.getElementById("clientIPs").value = ips;
+                document.getElementById("clientIPs").value = Array.isArray(ips) ? ips.join("\n") : ips;
             },
             async clearDBClientIps(email) {
                 try {

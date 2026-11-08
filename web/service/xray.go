@@ -195,6 +195,9 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		inboundConfig := inbound.GenXrayInboundConfig()
 		xrayConfig.InboundConfigs = append(xrayConfig.InboundConfigs, *inboundConfig)
 	}
+	if err := WriteClientIPLimits(); err != nil {
+		return nil, err
+	}
 	return xrayConfig, nil
 }
 
@@ -230,6 +233,9 @@ func (s *XrayService) RestartXray(isForce bool) error {
 	xrayConfig, err := s.GetXrayConfig()
 	if err != nil {
 		return err
+	}
+	if !xray.NativeIPLimitAvailable() {
+		logger.Warning("[LimitIP] Installed core lacks TDZ native admission controls; install the matching TDZ panel release to enable IP limits.")
 	}
 
 	if s.IsXrayRunning() {

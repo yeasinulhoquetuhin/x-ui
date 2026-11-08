@@ -929,15 +929,15 @@ update_all_geofiles() {
 
 update_geofiles() {
     case "${1}" in
-      "main") dat_files=(geoip geosite); dat_source="Loyalsoldier/v2ray-rules-dat";;
-        "IR") dat_files=(geoip_IR geosite_IR); dat_source="chocolate4u/Iran-v2ray-rules" ;;
-        "RU") dat_files=(geoip_RU geosite_RU); dat_source="runetfreedom/russia-v2ray-rules-dat";;
+      "main") dat_files=(geoip geosite);;
+        "IR") dat_files=(geoip_IR geosite_IR);;
+        "RU") dat_files=(geoip_RU geosite_RU);;
     esac
     for dat in "${dat_files[@]}"; do
         # Remove suffix for remote filename (e.g., geoip_IR -> geoip)
-        remote_file="${dat%%_*}"
+        remote_file="$dat"
         curl -fLRo ${xui_folder}/bin/${dat}.dat -z ${xui_folder}/bin/${dat}.dat \
-            https://github.com/${dat_source}/releases/latest/download/${remote_file}.dat
+            https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/${remote_file}.dat
     done
 }
 

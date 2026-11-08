@@ -251,7 +251,7 @@
             <a-tag v-else>0</a-tag>
           </td>
         </tr>
-        <tr v-if="app.ipLimitEnable && infoModal.clientSettings.limitIp > 0">
+        <tr v-if="app.ipLimitEnable && infoModal.clientSettings">
           <td>{{ i18n "pages.inbounds.IPLimitlog" }}</td>
           <td>
             <div style="max-height: 150px; min-height: 32px; overflow-y: auto; text-align: left; padding: 4px 0;">
@@ -541,7 +541,7 @@
   function refreshIPs(email) {
     return HttpUtil.post(`/panel/api/inbounds/clientIps/${email}`).then((msg) => {
       if (!msg.success) {
-        return { text: 'No IP Record', array: [] };
+        return { text: 'Live IP tracking unavailable', array: [] };
       }
 
       const formatIpRecord = (record) => {
@@ -576,6 +576,9 @@
 
       try {
         let ips = msg.obj;
+        if (ips === 'No IP Record') {
+          return { text: 'No IP Record', array: [] };
+        }
         // If msg.obj is a string, try to parse it
         if (typeof ips === 'string') {
           try {
@@ -588,6 +591,9 @@
         // Normalize single object response to array
         if (ips && !Array.isArray(ips) && typeof ips === 'object') {
           ips = [ips];
+        }
+        if (ips == null || (Array.isArray(ips) && ips.length === 0)) {
+          return { text: 'No IP Record', array: [] };
         }
 
         // New format or object array
@@ -608,7 +614,7 @@
       } catch (e) {
         return { text: 'Error loading IPs', array: [] };
       }
-    });
+    }).catch(() => ({ text: 'Live IP tracking unavailable', array: [] }));
   }
 
   const infoModal = {
@@ -628,6 +634,8 @@
     clientIps: '',
     clientIpsArray: [],
     show(dbInbound, index) {
+	  this.clientIps = '';
+	  this.clientIpsArray = [];
       this.index = index;
       this.inbound = dbInbound.toInbound();
       this.dbInbound = new DBInbound(dbInbound);
@@ -635,17 +643,12 @@
       this.isExpired = this.inbound.clients ? this.inbound.isExpiry(index) : this.dbInbound.isExpiry;
       this.clientStats = this.inbound.clients ? (this.dbInbound.clientStats.find(row => row.email === this.clientSettings.email) || null) : null;
 
-      if (
-        [
-          Protocols.VMESS,
-          Protocols.VLESS,
-          Protocols.TROJAN,
-          Protocols.SHADOWSOCKS
-        ].includes(this.inbound.protocol)
-      ) {
-        if (app.ipLimitEnable && this.clientSettings.limitIp) {
+      if (this.clientSettings && this.clientSettings.email) {
+        if (app.ipLimitEnable) {
           this.loadingIps = true;
-          refreshIPs(this.clientStats.email).then((result) => {
+          const email = this.clientSettings.email;
+          refreshIPs(email).then((result) => {
+            if (!this.clientSettings || this.clientSettings.email !== email) return;
             this.clientIps = result.text;
             this.clientIpsArray = result.array;
           }).finally(() => {
@@ -780,8 +783,10 @@
       refreshIPs() {
         this.refreshing = true;
         this.loadingIps = true;
-        refreshIPs(this.infoModal.clientStats.email)
+        const email = this.infoModal.clientSettings.email;
+        refreshIPs(email)
           .then((result) => {
+            if (!this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) return;
             this.infoModal.clientIps = result.text;
             this.infoModal.clientIpsArray = result.array;
           })
@@ -791,7 +796,7 @@
           });
       },
       clearClientIps() {
-        HttpUtil.post(`/panel/api/inbounds/clearClientIps/${this.infoModal.clientStats.email}`)
+        HttpUtil.post(`/panel/api/inbounds/clearClientIps/${this.infoModal.clientSettings.email}`)
           .then((msg) => {
             if (!msg.success) {
               return;

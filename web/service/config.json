@@ -1,6 +1,6 @@
 {
   "log": {
-    "access": "/var/log/xray/access.log",
+    "access": "./access.log",
     "dnsLog": false,
     "error": "",
     "loglevel": "warning",
@@ -45,7 +45,8 @@
     "levels": {
       "0": {
         "statsUserDownlink": true,
-        "statsUserUplink": true
+        "statsUserUplink": true,
+        "statsUserOnline": true
       }
     },
     "system": {

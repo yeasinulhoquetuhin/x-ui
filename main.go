@@ -394,6 +394,7 @@ func GetListenIP(getListen bool) {
 
 // migrateDb performs database migration operations for the 3x-ui panel.
 func migrateDb() {
+	logger.InitLogger(logging.WARNING)
 	inboundService := service.InboundService{}
 
 	err := database.InitDB(config.GetDBPath())
@@ -403,6 +404,10 @@ func migrateDb() {
 	fmt.Println("Start migrating database...")
 	inboundService.MigrateDB()
 	fmt.Println("Migration done!")
+	settingService := service.SettingService{}
+	if _, err := settingService.GetXrayConfigTemplate(); err != nil {
+		log.Fatal("Failed to migrate Xray tracking settings: ", err)
+	}
 }
 
 // main is the entry point of the 3x-ui application.

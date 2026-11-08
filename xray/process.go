@@ -2,12 +2,14 @@ package xray
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -31,6 +33,18 @@ func GetBinaryPath() string {
 // GetConfigPath returns the path to the Xray configuration file in the binary folder.
 func GetConfigPath() string {
 	return config.GetBinFolderPath() + "/config.json"
+}
+
+func GetIPLimitConfigPath() string {
+	return filepath.Join(config.GetDBFolderPath(), "client-ip-limits.json")
+}
+
+// NativeIPLimitAvailable identifies the bundled core with admission controls.
+func NativeIPLimitAvailable() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, GetBinaryPath(), "-version").Output()
+	return err == nil && bytes.Contains(output, []byte("TDZ-IPLimit/1"))
 }
 
 // GetGeositePath returns the path to the geosite data file used by Xray.
@@ -264,6 +278,11 @@ func (p *process) Start() (err error) {
 	}
 
 	cmd := exec.Command(GetBinaryPath(), "-c", configPath)
+	limitPath, err := filepath.Abs(GetIPLimitConfigPath())
+	if err != nil {
+		return err
+	}
+	cmd.Env = append(os.Environ(), "TDZ_XRAY_IP_LIMITS="+limitPath)
 	p.cmd = cmd
 
 	cmd.Stdout = p.logWriter

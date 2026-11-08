@@ -67,10 +67,15 @@ class WebSocketClient {
         this.emit('error', error);
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
         console.log('WebSocket disconnected');
         this.isConnected = false;
         this.emit('disconnected');
+        if (event.code === 1008) {
+          this.shouldReconnect = false;
+          window.location.replace(this.basePath || '/');
+          return;
+        }
         
         if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.reconnectAttempts++;

@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .cache/
+__pycache__/
 .sync*
 
 # Ignore log files
@@ -10,6 +11,8 @@
 # Ignore temporary files
 tmp/
 *.tar.gz
+!third_party/xray-core-v26.4.25-source.tar.gz
+!third_party/xray-core-v26.4.25-source.tar.gz.sha256
 
 # Ignore build and distribution directories
 backup/

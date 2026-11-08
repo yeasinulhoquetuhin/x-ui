@@ -13,6 +13,7 @@ on:
       - "**.html"
       - "**.sh"
       - "**.go"
+      - "xray-patches/**"
       - "go.mod"
       - "go.sum"
       - "x-ui.service.debian"
@@ -58,6 +59,17 @@ jobs:
       - name: Run tests
         run: go test -race -shuffle=on ./...
 
+      - name: Test bundled Xray admission limiter
+        run: |
+          bash build_xray.sh .cache/xray-test
+          TDZ_TEST_XRAY="$PWD/.cache/xray-test" go test ./xray -run TestNativeIPLimitTransports -count=1
+          (cd .cache/xray-core && go test -race ./app/dispatcher ./common/mux)
+
+      - name: Test installer and client UI
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          node --test tests/client_models.test.cjs
+
   build:
     needs: analyze
     permissions:
@@ -67,11 +79,6 @@ jobs:
         platform:
           - amd64
           - arm64
-          - armv7
-          - armv6
-          - 386
-          - armv5
-          - s390x
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -125,44 +132,12 @@ jobs:
           mkdir x-ui/bin
           cd x-ui/bin
 
-          # Download dependencies
-          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v26.4.25/"
-          if [ "${{ matrix.platform }}" == "amd64" ]; then
-            wget -q ${Xray_URL}Xray-linux-64.zip
-            unzip Xray-linux-64.zip
-            rm -f Xray-linux-64.zip
-          elif [ "${{ matrix.platform }}" == "arm64" ]; then
-            wget -q ${Xray_URL}Xray-linux-arm64-v8a.zip
-            unzip Xray-linux-arm64-v8a.zip
-            rm -f Xray-linux-arm64-v8a.zip
-          elif [ "${{ matrix.platform }}" == "armv7" ]; then
-            wget -q ${Xray_URL}Xray-linux-arm32-v7a.zip
-            unzip Xray-linux-arm32-v7a.zip
-            rm -f Xray-linux-arm32-v7a.zip
-          elif [ "${{ matrix.platform }}" == "armv6" ]; then
-            wget -q ${Xray_URL}Xray-linux-arm32-v6.zip
-            unzip Xray-linux-arm32-v6.zip
-            rm -f Xray-linux-arm32-v6.zip
-          elif [ "${{ matrix.platform }}" == "386" ]; then
-            wget -q ${Xray_URL}Xray-linux-32.zip
-            unzip Xray-linux-32.zip
-            rm -f Xray-linux-32.zip
-          elif [ "${{ matrix.platform }}" == "armv5" ]; then
-            wget -q ${Xray_URL}Xray-linux-arm32-v5.zip
-            unzip Xray-linux-arm32-v5.zip
-            rm -f Xray-linux-arm32-v5.zip
-          elif [ "${{ matrix.platform }}" == "s390x" ]; then
-            wget -q ${Xray_URL}Xray-linux-s390x.zip
-            unzip Xray-linux-s390x.zip
-            rm -f Xray-linux-s390x.zip
-          fi
+          # Bundle the pinned, admission-limited core with every release.
+          bash ../../build_xray.sh xray
           rm -f geoip.dat geosite.dat
-          wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-          wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-          wget -q -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
-          wget -q -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
-          wget -q -O geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
-          wget -q -O geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+          for asset in geoip.dat geosite.dat geoip_IR.dat geosite_IR.dat geoip_RU.dat geosite_RU.dat; do
+            wget -q "https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/$asset"
+          done
           mv xray xray-linux-${{ matrix.platform }}
           cd ../..
 
@@ -234,6 +209,7 @@ jobs:
           gcc --version
 
           go build -ldflags "-w -s" -o xui-release.exe -v main.go
+          bash build_xray.sh xray-limited.exe
 
       - name: Copy and download resources
         shell: pwsh
@@ -243,18 +219,11 @@ jobs:
           mkdir x-ui\bin
           cd x-ui\bin
 
-          # Download Xray for Windows
-          $Xray_URL = "https://github.com/XTLS/Xray-core/releases/download/v26.4.25/"
-          Invoke-WebRequest -Uri "${Xray_URL}Xray-windows-64.zip" -OutFile "Xray-windows-64.zip"
-          Expand-Archive -Path "Xray-windows-64.zip" -DestinationPath .
-          Remove-Item "Xray-windows-64.zip"
+          Copy-Item ..\..\xray-limited.exe xray.exe
           Remove-Item geoip.dat, geosite.dat -ErrorAction SilentlyContinue
-          Invoke-WebRequest -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" -OutFile "geoip.dat"
-          Invoke-WebRequest -Uri "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" -OutFile "geosite.dat"
-          Invoke-WebRequest -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat" -OutFile "geoip_IR.dat"
-          Invoke-WebRequest -Uri "https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat" -OutFile "geosite_IR.dat"
-          Invoke-WebRequest -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat" -OutFile "geoip_RU.dat"
-          Invoke-WebRequest -Uri "https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat" -OutFile "geosite_RU.dat"
+          foreach ($asset in @("geoip.dat", "geosite.dat", "geoip_IR.dat", "geosite_IR.dat", "geoip_RU.dat", "geosite_RU.dat")) {
+            Invoke-WebRequest -Uri "https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/$asset" -OutFile $asset
+          }
           Rename-Item xray.exe xray-windows-amd64.exe
           cd ..
           Copy-Item -Path ..\windows_files\* -Destination . -Recurse

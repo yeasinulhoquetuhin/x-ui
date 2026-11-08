@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ import (
 type InboundService struct {
 	xrayApi xray.XrayAPI
 }
+
+var clientTrafficMu sync.Mutex
 
 type CopyClientsResult struct {
 	Added   []string `json:"added"`
@@ -135,17 +138,21 @@ func (s *InboundService) checkPortExist(listen string, port int, ignoreId int) (
 }
 
 func (s *InboundService) GetClients(inbound *model.Inbound) ([]model.Client, error) {
-	settings := map[string][]model.Client{}
-	json.Unmarshal([]byte(inbound.Settings), &settings)
-	if settings == nil {
-		return nil, fmt.Errorf("setting is null")
+	var settings struct {
+		Clients []model.Client `json:"clients"`
 	}
-
-	clients := settings["clients"]
-	if clients == nil {
-		return nil, nil
+	if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+		return nil, err
 	}
-	return clients, nil
+	for _, client := range settings.Clients {
+		if client.LimitIP < 0 || (client.LimitIP > 0 && strings.TrimSpace(client.Email) == "") {
+			return nil, fmt.Errorf("IP limit requires a non-empty client email and a non-negative limit")
+		}
+		if err := validateClientTrafficReset(client.TrafficReset, client.TrafficResetDays); err != nil {
+			return nil, err
+		}
+	}
+	return settings.Clients, nil
 }
 
 func (s *InboundService) getAllEmails() ([]string, error) {
@@ -1223,6 +1230,8 @@ func (s *InboundService) UpdateInboundClient(data *model.Inbound, clientId strin
 }
 
 func (s *InboundService) AddTraffic(inboundTraffics []*xray.Traffic, clientTraffics []*xray.ClientTraffic) (error, bool) {
+	clientTrafficMu.Lock()
+	defer clientTrafficMu.Unlock()
 	var err error
 	db := database.GetDB()
 	tx := db.Begin()
@@ -1338,7 +1347,9 @@ func (s *InboundService) addClientTraffic(tx *gorm.DB, traffics []*xray.ClientTr
 	}
 
 	// Set onlineUsers
-	p.SetOnlineClients(onlineClients)
+	if p != nil {
+		p.SetOnlineClients(onlineClients)
+	}
 
 	err = tx.Save(dbClientTraffics).Error
 	if err != nil {
@@ -1377,6 +1388,10 @@ func (s *InboundService) adjustTraffics(tx *gorm.DB, dbClientTraffics []*xray.Cl
 							c["expiryTime"] = newExpiryTime
 							c["updated_at"] = time.Now().Unix() * 1000
 							dbClientTraffics[traffic_index].ExpiryTime = newExpiryTime
+							client := model.Client{TrafficReset: dbClientTraffics[traffic_index].TrafficReset, TrafficResetDays: dbClientTraffics[traffic_index].TrafficResetDays, ExpiryTime: newExpiryTime}
+							if err := configureClientTrafficReset(dbClientTraffics[traffic_index], &client, time.Now()); err != nil {
+								return nil, err
+							}
 							break
 						}
 					}
@@ -1615,20 +1630,34 @@ func (s *InboundService) AddClientStat(tx *gorm.DB, inboundId int, client *model
 	clientTraffic.Up = 0
 	clientTraffic.Down = 0
 	clientTraffic.Reset = client.Reset
+	if err := configureClientTrafficReset(&clientTraffic, client, time.Now()); err != nil {
+		return err
+	}
 	result := tx.Create(&clientTraffic)
 	err := result.Error
 	return err
 }
 
 func (s *InboundService) UpdateClientStat(tx *gorm.DB, email string, client *model.Client) error {
+	var existing xray.ClientTraffic
+	if err := tx.Where("email = ?", email).First(&existing).Error; err != nil {
+		return err
+	}
+	if err := configureClientTrafficReset(&existing, client, time.Now()); err != nil {
+		return err
+	}
 	result := tx.Model(xray.ClientTraffic{}).
 		Where("email = ?", email).
 		Updates(map[string]any{
-			"enable":      client.Enable,
-			"email":       client.Email,
-			"total":       client.TotalGB,
-			"expiry_time": client.ExpiryTime,
-			"reset":       client.Reset,
+			"enable":              client.Enable,
+			"email":               client.Email,
+			"total":               client.TotalGB,
+			"expiry_time":         client.ExpiryTime,
+			"reset":               client.Reset,
+			"traffic_reset":       existing.TrafficReset,
+			"traffic_reset_days":  existing.TrafficResetDays,
+			"traffic_reset_start": existing.TrafficResetStart,
+			"next_traffic_reset":  existing.NextTrafficReset,
 		})
 	err := result.Error
 	return err
@@ -2196,7 +2225,7 @@ func (s *InboundService) DelDepletedClients(id int) (err error) {
 		}
 	}()
 
-	whereText := "reset = 0 and inbound_id "
+	whereText := "reset = 0 and (traffic_reset IS NULL OR traffic_reset = '' OR traffic_reset = 'never') and inbound_id "
 	if id < 0 {
 		whereText += "> ?"
 	} else {

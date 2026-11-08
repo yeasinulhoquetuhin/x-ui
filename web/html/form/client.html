@@ -193,6 +193,22 @@
     </template>
     <a-input-number v-model.number="client._totalGB" :min="0"></a-input-number>
   </a-form-item>
+  <a-form-item label="Auto Traffic Reset">
+    <a-select v-model="client.trafficReset" :dropdown-class-name="themeSwitcher.currentTheme">
+      <a-select-option value="never">Disabled</a-select-option>
+      <a-select-option value="daily">Daily</a-select-option>
+      <a-select-option value="weekly">Weekly</a-select-option>
+      <a-select-option value="monthly">Monthly</a-select-option>
+      <a-select-option value="custom">Custom days</a-select-option>
+    </a-select>
+    <small>Resets used traffic only. Account expiry stays the same.</small>
+  </a-form-item>
+  <a-form-item v-if="client.trafficReset === 'custom'" label="Reset every (days)">
+    <a-input-number v-model.number="client.trafficResetDays" :min="1" :max="36500" :precision="0"></a-input-number>
+  </a-form-item>
+  <a-form-item v-if="isEdit && clientStats && clientStats.nextTrafficReset > 0" label="Next Traffic Reset">
+    [[ new Date(clientStats.nextTrafficReset).toLocaleString() ]]
+  </a-form-item>
   <a-form-item v-if="isEdit && clientStats" label='{{ i18n "usage" }}'>
     <a-tag :color="ColorUtils.clientUsageColor(clientStats, app.trafficDiff)">
       [[ SizeFormatter.sizeFormat(clientStats.up) ]] / [[

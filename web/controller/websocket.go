@@ -83,7 +83,8 @@ func NewWebSocketController(hub *websocket.Hub) *WebSocketController {
 // HandleWebSocket handles WebSocket connections
 func (w *WebSocketController) HandleWebSocket(c *gin.Context) {
 	// Check authentication
-	if !session.IsLogin(c) {
+	user := session.GetLoginUser(c)
+	if user == nil {
 		logger.Warningf("Unauthorized WebSocket connection attempt from %s", getRemoteIp(c))
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -110,7 +111,7 @@ func (w *WebSocketController) HandleWebSocket(c *gin.Context) {
 	logger.Debugf("WebSocket client %s registered from %s", clientID, getRemoteIp(c))
 
 	// Start goroutines for reading and writing
-	go w.writePump(client, conn)
+	go w.writePump(client, conn, func() bool { return session.UserIsCurrent(user) })
 	go w.readPump(client, conn)
 }
 
@@ -153,19 +154,25 @@ func (w *WebSocketController) readPump(client *websocket.Client, conn *ws.Conn) 
 }
 
 // writePump pumps messages from the hub to the WebSocket connection
-func (w *WebSocketController) writePump(client *websocket.Client, conn *ws.Conn) {
+func (w *WebSocketController) writePump(client *websocket.Client, conn *ws.Conn, authenticated func() bool) {
 	ticker := time.NewTicker(pingPeriod)
+	authTicker := time.NewTicker(time.Second)
 	defer func() {
 		if r := common.Recover("WebSocket writePump panic"); r != nil {
 			logger.Error("WebSocket writePump panic recovered:", r)
 		}
 		ticker.Stop()
+		authTicker.Stop()
 		conn.Close()
 	}()
 
 	for {
 		select {
 		case message, ok := <-client.Send:
+			if !authenticated() {
+				_ = conn.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(ws.ClosePolicyViolation, "Credentials changed; please log in again"), time.Now().Add(writeWait))
+				return
+			}
 			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// Hub closed the channel
@@ -180,6 +187,11 @@ func (w *WebSocketController) writePump(client *websocket.Client, conn *ws.Conn)
 				return
 			}
 
+		case <-authTicker.C:
+			if !authenticated() {
+				_ = conn.WriteControl(ws.CloseMessage, ws.FormatCloseMessage(ws.ClosePolicyViolation, "Credentials changed; please log in again"), time.Now().Add(writeWait))
+				return
+			}
 		case <-ticker.C:
 			conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := conn.WriteMessage(ws.PingMessage, nil); err != nil {

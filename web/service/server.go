@@ -1,13 +1,12 @@
 package service
 
 import (
-	"archive/zip"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -519,7 +518,7 @@ func (s *ServerService) sampleCPUUtilization() (float64, error) {
 
 func (s *ServerService) GetXrayVersions() ([]string, error) {
 	const (
-		XrayURL    = "https://api.github.com/repos/XTLS/Xray-core/releases"
+		XrayURL    = "https://api.github.com/repos/yeasinulhoquetuhin/x-ui/releases"
 		bufferSize = 8192
 	)
 
@@ -547,28 +546,27 @@ func (s *ServerService) GetXrayVersions() ([]string, error) {
 		return nil, err
 	}
 
-	var releases []Release
+	var releases []struct {
+		TagName string `json:"tag_name"`
+		Draft   bool   `json:"draft"`
+		Assets  []struct {
+			Name string `json:"name"`
+		} `json:"assets"`
+	}
 	if err := json.Unmarshal(buffer.Bytes(), &releases); err != nil {
 		return nil, err
 	}
 
 	var versions []string
 	for _, release := range releases {
-		tagVersion := strings.TrimPrefix(release.TagName, "v")
-		tagParts := strings.Split(tagVersion, ".")
-		if len(tagParts) != 3 {
+		if release.Draft {
 			continue
 		}
-
-		major, err1 := strconv.Atoi(tagParts[0])
-		minor, err2 := strconv.Atoi(tagParts[1])
-		patch, err3 := strconv.Atoi(tagParts[2])
-		if err1 != nil || err2 != nil || err3 != nil {
-			continue
-		}
-
-		if major > 26 || (major == 26 && minor > 3) || (major == 26 && minor == 3 && patch >= 10) {
-			versions = append(versions, release.TagName)
+		for _, asset := range release.Assets {
+			if asset.Name == "tdz-"+xray.GetBinaryName() {
+				versions = append(versions, release.TagName)
+				break
+			}
 		}
 	}
 	return versions, nil
@@ -593,43 +591,22 @@ func (s *ServerService) RestartXrayService() error {
 }
 
 func (s *ServerService) downloadXRay(version string) (string, error) {
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
-
-	switch osName {
-	case "darwin":
-		osName = "macos"
-	case "windows":
-		osName = "windows"
+	if !regexp.MustCompile(`^v[0-9][A-Za-z0-9._-]*$`).MatchString(version) {
+		return "", fmt.Errorf("invalid release version")
 	}
-
-	switch arch {
-	case "amd64":
-		arch = "64"
-	case "arm64":
-		arch = "arm64-v8a"
-	case "armv7":
-		arch = "arm32-v7a"
-	case "armv6":
-		arch = "arm32-v6"
-	case "armv5":
-		arch = "arm32-v5"
-	case "386":
-		arch = "32"
-	case "s390x":
-		arch = "s390x"
-	}
-
-	fileName := fmt.Sprintf("Xray-%s-%s.zip", osName, arch)
-	url := fmt.Sprintf("https://github.com/XTLS/Xray-core/releases/download/%s/%s", version, fileName)
-	resp, err := http.Get(url)
+	fileName := "tdz-" + xray.GetBinaryName()
+	url := fmt.Sprintf("https://github.com/yeasinulhoquetuhin/x-ui/releases/download/%s/%s", version, fileName)
+	client := &http.Client{Timeout: 3 * time.Minute}
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	os.Remove(fileName)
-	file, err := os.Create(fileName)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("core download failed: HTTP %d", resp.StatusCode)
+	}
+	file, err := os.CreateTemp(filepath.Dir(xray.GetBinaryPath()), ".tdz-xray-*")
 	if err != nil {
 		return "", err
 	}
@@ -637,75 +614,58 @@ func (s *ServerService) downloadXRay(version string) (string, error) {
 
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
+		os.Remove(file.Name())
 		return "", err
 	}
-
-	return fileName, nil
+	if err := file.Chmod(0755); err != nil {
+		os.Remove(file.Name())
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(file.Name())
+		return "", err
+	}
+	return file.Name(), nil
 }
 
 func (s *ServerService) UpdateXray(version string) error {
-	// 1. Stop xray before doing anything
-	if err := s.StopXrayService(); err != nil {
-		logger.Warning("failed to stop xray before update:", err)
-	}
-
-	// 2. Download the zip
-	zipFileName, err := s.downloadXRay(version)
+	fileName, err := s.downloadXRay(version)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(zipFileName)
-
-	zipFile, err := os.Open(zipFileName)
-	if err != nil {
-		return err
+	defer os.Remove(fileName)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, fileName, "-version").Output()
+	if err != nil || !bytes.Contains(output, []byte("TDZ-IPLimit/1")) {
+		return fmt.Errorf("download is not a compatible TDZ core")
 	}
-	defer zipFile.Close()
-
-	stat, err := zipFile.Stat()
-	if err != nil {
-		return err
-	}
-	reader, err := zip.NewReader(zipFile, stat.Size())
-	if err != nil {
-		return err
-	}
-
-	// 3. Helper to extract files
-	copyZipFile := func(zipName string, fileName string) error {
-		zipFile, err := reader.Open(zipName)
-		if err != nil {
+	wasRunning := s.xrayService.IsXrayRunning()
+	if wasRunning {
+		if err := s.StopXrayService(); err != nil {
 			return err
 		}
-		defer zipFile.Close()
-		os.MkdirAll(filepath.Dir(fileName), 0755)
-		os.Remove(fileName)
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_TRUNC, fs.ModePerm)
-		if err != nil {
-			return err
+	}
+	backup := xray.GetBinaryPath() + ".previous"
+	if err := os.Rename(xray.GetBinaryPath(), backup); err != nil {
+		return err
+	}
+	if err := os.Rename(fileName, xray.GetBinaryPath()); err != nil {
+		_ = os.Rename(backup, xray.GetBinaryPath())
+		if wasRunning {
+			_ = s.xrayService.RestartXray(true)
 		}
-		defer file.Close()
-		_, err = io.Copy(file, zipFile)
 		return err
 	}
-
-	// 4. Extract correct binary
-	if runtime.GOOS == "windows" {
-		targetBinary := filepath.Join("bin", "xray-windows-amd64.exe")
-		err = copyZipFile("xray.exe", targetBinary)
-	} else {
-		err = copyZipFile("xray", xray.GetBinaryPath())
-	}
-	if err != nil {
-		return err
-	}
-
-	// 5. Restart xray
 	if err := s.xrayService.RestartXray(true); err != nil {
-		logger.Error("start xray failed:", err)
+		_ = os.Remove(xray.GetBinaryPath())
+		_ = os.Rename(backup, xray.GetBinaryPath())
+		if wasRunning {
+			_ = s.xrayService.RestartXray(true)
+		}
 		return err
 	}
-
+	_ = os.Remove(backup)
 	return nil
 }
 
@@ -1061,12 +1021,12 @@ func (s *ServerService) UpdateGeofile(fileName string) error {
 		FileName string
 	}
 	geofileAllowlist := map[string]geofileEntry{
-		"geoip.dat":      {"https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat", "geoip.dat"},
-		"geosite.dat":    {"https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat", "geosite.dat"},
-		"geoip_IR.dat":   {"https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat", "geoip_IR.dat"},
-		"geosite_IR.dat": {"https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat", "geosite_IR.dat"},
-		"geoip_RU.dat":   {"https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat", "geoip_RU.dat"},
-		"geosite_RU.dat": {"https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat", "geosite_RU.dat"},
+		"geoip.dat":      {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geoip.dat", "geoip.dat"},
+		"geosite.dat":    {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geosite.dat", "geosite.dat"},
+		"geoip_IR.dat":   {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geoip_IR.dat", "geoip_IR.dat"},
+		"geosite_IR.dat": {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geosite_IR.dat", "geosite_IR.dat"},
+		"geoip_RU.dat":   {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geoip_RU.dat", "geoip_RU.dat"},
+		"geosite_RU.dat": {"https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/geosite_RU.dat", "geosite_RU.dat"},
 	}
 
 	// Strict allowlist check to avoid writing uncontrolled files

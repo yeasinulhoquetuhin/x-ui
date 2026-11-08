@@ -275,7 +275,20 @@ func (s *SettingService) setInt(key string, value int) error {
 }
 
 func (s *SettingService) GetXrayConfigTemplate() (string, error) {
-	return s.getString("xrayTemplateConfig")
+	raw, err := s.getString("xrayTemplateConfig")
+	if err != nil {
+		return "", err
+	}
+	normalized, err := normalizeXrayTrackingConfig(UnwrapXrayTemplateConfig(raw))
+	if err != nil {
+		return "", err
+	}
+	if normalized != raw {
+		if err := s.saveSetting("xrayTemplateConfig", normalized); err != nil {
+			return "", err
+		}
+	}
+	return normalized, nil
 }
 
 func (s *SettingService) GetXrayOutboundTestUrl() (string, error) {
@@ -629,11 +642,7 @@ func (s *SettingService) SetExternalTrafficInformURI(InformURI string) error {
 }
 
 func (s *SettingService) GetIpLimitEnable() (bool, error) {
-	accessLogPath, err := xray.GetAccessLogPath()
-	if err != nil {
-		return false, err
-	}
-	return (accessLogPath != "none" && accessLogPath != ""), nil
+	return xray.NativeIPLimitAvailable(), nil
 }
 
 // GetLdapEnable returns whether LDAP is enabled.

@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"net/http"
 
+	"github.com/mhsanaei/3x-ui/v2/database"
 	"github.com/mhsanaei/3x-ui/v2/database/model"
 
 	"github.com/gin-contrib/sessions"
@@ -44,7 +45,25 @@ func GetLoginUser(c *gin.Context) *model.User {
 		s.Delete(loginUserKey)
 		return nil
 	}
+	if !UserIsCurrent(&user) {
+		ClearSession(c)
+		_ = s.Save()
+		return nil
+	}
 	return &user
+}
+
+// UserIsCurrent also covers credential changes made by the command-line tool:
+// cookies issued for the previous credentials stop authenticating immediately.
+func UserIsCurrent(user *model.User) bool {
+	if user == nil || database.GetDB() == nil {
+		return false
+	}
+	var current model.User
+	if err := database.GetDB().First(&current, user.Id).Error; err != nil {
+		return false
+	}
+	return current.Username == user.Username && current.Password == user.Password
 }
 
 // IsLogin checks if a user is currently authenticated in the session.

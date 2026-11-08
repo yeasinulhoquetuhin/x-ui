@@ -21,10 +21,83 @@ func (s *XraySettingService) SaveXraySetting(newXraySettings string) error {
 	// back here. Strip it before validation/storage, otherwise we save
 	// garbage the next read can't recover from without this same call.
 	newXraySettings = UnwrapXrayTemplateConfig(newXraySettings)
+	var err error
+	newXraySettings, err = normalizeXrayTrackingConfig(newXraySettings)
+	if err != nil {
+		return err
+	}
 	if err := s.CheckXrayConfig(newXraySettings); err != nil {
 		return err
 	}
 	return s.SettingService.saveSetting("xrayTemplateConfig", newXraySettings)
+}
+
+// normalizeXrayTrackingConfig repairs the old installer default and enables the
+// core's connection-based IP counters. Other logging and policy fields survive.
+func normalizeXrayTrackingConfig(raw string) (string, error) {
+	var cfg map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return "", err
+	}
+	if cfg == nil {
+		return "", common.NewError("xray template config must be an object")
+	}
+	var logConfig map[string]any
+	if err := json.Unmarshal(cfg["log"], &logConfig); len(cfg["log"]) > 0 && err != nil {
+		return "", err
+	}
+	if logConfig == nil {
+		logConfig = make(map[string]any)
+	}
+	if path, _ := logConfig["access"].(string); path == "" || path == "/var/log/xray/access.log" {
+		logConfig["access"] = "./access.log"
+	}
+	cfg["log"], _ = json.Marshal(logConfig)
+	var policy map[string]json.RawMessage
+	if err := json.Unmarshal(cfg["policy"], &policy); len(cfg["policy"]) > 0 && err != nil {
+		return "", err
+	}
+	if policy == nil {
+		policy = make(map[string]json.RawMessage)
+	}
+	var levels map[string]map[string]any
+	if err := json.Unmarshal(policy["levels"], &levels); len(policy["levels"]) > 0 && err != nil {
+		return "", err
+	}
+	if levels == nil {
+		levels = make(map[string]map[string]any)
+	}
+	if levels["0"] == nil {
+		levels["0"] = make(map[string]any)
+	}
+	for _, level := range levels {
+		if level != nil {
+			level["statsUserOnline"] = true
+		}
+	}
+	policy["levels"], _ = json.Marshal(levels)
+	cfg["policy"], _ = json.Marshal(policy)
+	var api map[string]any
+	if err := json.Unmarshal(cfg["api"], &api); len(cfg["api"]) > 0 && err != nil {
+		return "", err
+	}
+	if api == nil {
+		api = map[string]any{"tag": "api"}
+	}
+	services, _ := api["services"].([]any)
+	for _, required := range []string{"StatsService"} {
+		found := false
+		for _, value := range services {
+			found = found || value == required
+		}
+		if !found {
+			services = append(services, required)
+		}
+	}
+	api["services"] = services
+	cfg["api"], _ = json.Marshal(api)
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	return string(data), err
 }
 
 func (s *XraySettingService) CheckXrayConfig(XrayTemplateConfig string) error {
