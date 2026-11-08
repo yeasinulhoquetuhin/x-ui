@@ -66,8 +66,8 @@ func TestLimitsIncludeEveryClientProtocolAndExactEmail(t *testing.T) {
 	setupIPTrackingDB(t)
 	for i, protocol := range []string{"vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2"} {
 		settings := map[string]any{"decryption": "none", "method": "2022-blake3-aes-256-gcm", "version": 2, "clients": []map[string]any{
-			{"email": protocol + "_1", "limitIp": 1, "enable": true},
-			{"email": protocol + "_10", "limitIp": 3, "enable": true},
+			{"email": protocol + "_1", "limitIp": 1, "enable": true, "tgId": ""},
+			{"email": protocol + "_10", "limitIp": 3, "enable": true, "tgId": "123456789"},
 			{"email": protocol + "_off", "limitIp": 1, "enable": false},
 		}}
 		data, _ := json.Marshal(settings)

@@ -74,7 +74,7 @@
             </template>
             <a-input v-model.trim="clientsBulkModal.subId"></a-input>
         </a-form-item>
-        <a-form-item v-if="app.tgBotEnable">
+        <a-form-item>
             <template slot="label">
                 <a-tooltip>
                     <template slot="title">
@@ -85,7 +85,7 @@
                 </a-tooltip>
             </template>
             <a-input-number :style="{ width: '50%' }"
-                v-model.number="clientsBulkModal.tgId" min="0"></a-input-number>
+                v-model.number="clientsBulkModal.tgId" :precision="0"></a-input-number>
         </a-form-item>
         <a-form-item v-if="app.ipLimitEnable">
             <template slot="label">

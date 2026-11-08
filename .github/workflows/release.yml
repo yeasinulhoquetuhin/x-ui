@@ -150,9 +150,18 @@ jobs:
           name: x-ui-linux-${{ matrix.platform }}
           path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
 
+      - name: Check published Linux asset
+        id: release_asset
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          exists=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '[.assets[] | select(.name == "x-ui-linux-${{ matrix.platform }}.tar.gz")] | length > 0' 2>/dev/null || true)
+          echo "exists=${exists:-false}" >> "$GITHUB_OUTPUT"
+
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && steps.release_asset.outputs.exists != 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
@@ -192,6 +201,7 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-pkg-config
+            python
 
       - name: Build 3X-UI for Windows (CGO)
         shell: msys2 {0}
@@ -239,9 +249,19 @@ jobs:
           name: x-ui-windows-amd64
           path: ./x-ui-windows-amd64.zip
 
+      - name: Check published Windows asset
+        id: release_asset
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          exists=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '[.assets[] | select(.name == "x-ui-windows-amd64.zip")] | length > 0' 2>/dev/null || true)
+          echo "exists=${exists:-false}" >> "$GITHUB_OUTPUT"
+
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && steps.release_asset.outputs.exists != 'true'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}

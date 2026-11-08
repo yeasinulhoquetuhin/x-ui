@@ -108,7 +108,7 @@
     </template>
     <a-input v-model.trim="client.subId"></a-input>
   </a-form-item>
-  <a-form-item v-if="client.email && app.tgBotEnable">
+  <a-form-item v-if="client.email">
     <template slot="label">
       <a-tooltip>
         <template slot="title">
@@ -121,7 +121,7 @@
     <a-input-number
       :style="{ width: '50%' }"
       v-model.number="client.tgId"
-      min="0"
+      :precision="0"
     ></a-input-number>
   </a-form-item>
   <a-form-item v-if="client.email" label='{{ i18n "comment" }}'>
@@ -193,7 +193,7 @@
     </template>
     <a-input-number v-model.number="client._totalGB" :min="0"></a-input-number>
   </a-form-item>
-  <a-form-item label="Auto Traffic Reset">
+  <a-form-item label="Traffic Reset">
     <a-select v-model="client.trafficReset" :dropdown-class-name="themeSwitcher.currentTheme">
       <a-select-option value="never">Disabled</a-select-option>
       <a-select-option value="daily">Daily</a-select-option>

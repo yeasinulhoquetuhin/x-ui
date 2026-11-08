@@ -27,7 +27,9 @@ else
     [[ $(<"$source_dir/TDZ-UPSTREAM-REVISION") == "$revision" ]] || { printf '%s\n' 'Unexpected Xray source revision' >&2; exit 1; }
 fi
 if [[ ! -f "$source_dir/app/dispatcher/tdz_ip_limit.go" ]]; then
-    python3 "$root/xray-patches/apply.py" "$source_dir"
+    python_cmd="${PYTHON:-python3}"
+    command -v "$python_cmd" >/dev/null || python_cmd=python
+    "$python_cmd" "$root/xray-patches/apply.py" "$source_dir"
 fi
 cp "$root/xray-patches/testdata/tdz_ip_limit.go" "$source_dir/app/dispatcher/tdz_ip_limit.go"
 cp "$root/xray-patches/testdata/tdz_ip_limit_test.go" "$source_dir/app/dispatcher/tdz_ip_limit_test.go"

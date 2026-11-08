@@ -348,7 +348,7 @@
             infoModal.subJsonLink ]]</a>
         </tr-info-row>
       </template>
-      <template v-if="app.tgBotEnable && infoModal.clientSettings.tgId">
+      <template v-if="infoModal.clientSettings && infoModal.clientSettings.tgId">
         <a-divider>Telegram ChatID</a-divider>
         <tr-info-row class="tr-info-row">
           <tr-info-title class="tr-info-title">

@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">TDZ X-UI</h1>
-<p align="center"><b>3X-UI v2.9.3-patched.1</b></p>
+<p align="center"><b>3X-UI v2.9.3-patched.2</b></p>
 
 <p align="center">
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/latest">
@@ -80,15 +80,17 @@ The default access-log path is `./access.log`. Native IP limiting and live repor
 
 IP limits count source addresses visible to Xray. A shared public IP consumes one slot. Reverse proxies/CDNs must forward the real client address using a trusted configuration or PROXY protocol.
 
-## ◈ Automatic Client Traffic Reset
+## ◈ Client Traffic Reset
 
-Choose **Auto Traffic Reset → Daily / Weekly / Monthly / Custom days** in the client editor. The schedule resets used traffic while preserving the total quota, expiry and all-time usage. Monthly cycles are anchored to activation time, and delayed-start clients begin their cycle on first use.
+Choose **Traffic Reset → Daily / Weekly / Monthly / Custom days** in the client editor. The schedule resets used traffic while preserving the total quota, expiry and all-time usage. Monthly cycles are anchored to activation time, and delayed-start clients begin their cycle on first use.
 
-For a six-month account with a 100 GB monthly allowance: set expiry six months ahead, Total Traffic to 100 GB and Auto Traffic Reset to Monthly. Leave account auto-renewal disabled if access must end after those six months.
+For a six-month account with a 100 GB monthly allowance: set expiry six months ahead, Total Traffic to 100 GB and Traffic Reset to Monthly. Leave account auto-renewal disabled if access must end after those six months.
 
 ---
 
-## ◈ Changelog (v2.9.3-patched.1)
+## ◈ Changelog (v2.9.3-patched.2)
+
+- **Client compatibility** — Empty and numeric-string Telegram IDs decode correctly alongside JSON numbers; no database reset required
 
 - **IP Limit** — Atomic admission checks inside the bundled Xray core
 - **SSL Skip** — Bypass SSL setup during install or update with option 4

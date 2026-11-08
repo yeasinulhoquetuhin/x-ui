@@ -1,4 +1,6 @@
-# TDZ X-UI v2.9.3-patched.1
+# TDZ X-UI v2.9.3-patched.2
+
+- Hotfix: client Telegram IDs accept empty strings, numeric strings, JSON numbers, null and omitted fields. Existing client records and client forms work without a database reset.
 
 - Native per-client IP admission limits in the bundled Xray core, independent of access-log timing and Fail2ban.
 - Live connection IPs from the Xray stats API; offline IPs are removed on refresh.
@@ -6,12 +8,12 @@
 - Default access log is `./access.log`; existing `/var/log/xray/access.log` defaults migrate automatically.
 - Changing panel credentials invalidates existing HTTP sessions and closes authenticated WebSocket connections.
 - Re-running the installer updates the application while preserving the database, SSL, credentials, panel path, port, service file and local certificates. Failed migrations restore the previous application and database backup.
-- Per-client Auto Traffic Reset: daily, weekly, monthly or a custom number of days. Only current-cycle usage resets; account expiry, quota and all-time usage are preserved.
+- Per-client Traffic Reset: daily, weekly, monthly or a custom number of days. Only current-cycle usage resets; account expiry, quota and all-time usage are preserved.
 - Install/update scripts, core updates and bundled GeoIP/GeoSite downloads use this repository's releases.
 
 ## Six-month account with a monthly allowance
 
-Set the client's expiry six months ahead, Total Traffic to 100 GB, and Auto Traffic Reset to Monthly. Leave the existing account-renewal interval disabled if the account must stop at its six-month expiry. Monthly traffic cycles are anchored to activation time and catch up after panel downtime.
+Set the client's expiry six months ahead, Total Traffic to 100 GB, and Traffic Reset to Monthly. Leave the existing account-renewal interval disabled if the account must stop at its six-month expiry. Monthly traffic cycles are anchored to activation time and catch up after panel downtime.
 
 ## Installation / in-place update
 
