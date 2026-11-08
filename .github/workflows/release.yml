@@ -158,8 +158,7 @@ jobs:
           tag: ${{ github.ref_name }}
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
-          overwrite: true
-          prerelease: true
+          overwrite: false
 
   # =================================
   #  Windows Build
@@ -248,5 +247,4 @@ jobs:
           tag: ${{ github.ref_name }}
           file: x-ui-windows-amd64.zip
           asset_name: x-ui-windows-amd64.zip
-          overwrite: true
-          prerelease: true
+          overwrite: false

@@ -36,7 +36,7 @@ func NormalizeClientIP(raw string) (string, bool) {
 // never an empty snapshot and never a reason to label historical IPs as online.
 func (x *XrayAPI) GetOnlineClientIPs() (map[string][]ClientIP, error) {
 	if x.StatsServiceClient == nil {
-		return nil, errors.New("Xray stats API is not initialized")
+		return nil, errors.New("xray stats API is not initialized")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

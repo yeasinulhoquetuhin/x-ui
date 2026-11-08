@@ -24,7 +24,10 @@ if [[ -s "${XUI_DB_FOLDER:-/etc/x-ui}/x-ui.db" || -x "${xui_folder}/x-ui" ]]; th
 fi
 
 # check root
-[[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
+if [[ "${BASH_SOURCE[0]}" == "$0" && $EUID -ne 0 ]]; then
+    echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n "
+    exit 1
+fi
 
 # Check OS and set release variable
 if [[ -f /etc/os-release ]]; then
