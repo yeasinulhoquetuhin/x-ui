@@ -40,6 +40,8 @@ func initModels() error {
 		&model.HistoryOfSeeders{},
 		&model.CustomGeoResource{},
 		&model.ResellerAccess{},
+		&model.ResellerAccount{},
+		&model.ResellerInbound{},
 		&model.ResellerAudit{},
 	}
 	for _, model := range models {
@@ -158,7 +160,10 @@ func InitDB(dbPath string) error {
 	if err := initUser(); err != nil {
 		return err
 	}
-	return runSeeders(isUsersEmpty)
+	if err := runSeeders(isUsersEmpty); err != nil {
+		return err
+	}
+	return migrateLegacyResellers()
 }
 
 // CloseDB closes the database connection if it exists.

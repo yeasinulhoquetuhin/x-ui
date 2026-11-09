@@ -8,7 +8,7 @@ An actively maintained 3X-UI distribution with native IP admission limits, scope
 
 **Maintainer:** [Yeasinul Hoque Tuhin](https://github.com/yeasinulhoquetuhin)
 
-**Current release:** `v2.9.3-patched.2` · **Base panel:** 3X-UI 2.9.3
+**Current release:** `v2.9.3-patched.3` · **Base panel:** 3X-UI 2.9.3
 
 [Install](#install-or-update) · [Downloads](#downloads) · [Resellers](#inbound-reseller-access) · [IP limits](#native-ip-limits) · [Traffic resets](#client-traffic-resets) · [Build](#building-from-source)
 
@@ -24,7 +24,7 @@ Without an argument, the installer selects the latest published package for your
 
 ### Choose a version
 
-Append `v0`, `v1`, or `v2` to the same command:
+Append `v0`, `v1`, `v2`, or `v3` to the same command:
 
 ```bash
 # July 2026 archive
@@ -33,8 +33,11 @@ bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master
 # Previous native-IP-limit release
 bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v1
 
-# Current release
+# V2 per-inbound reseller release
 bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v2
+
+# V3 independent reseller accounts
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v3
 ```
 
 | Shortcut | Release | Contents |
@@ -42,6 +45,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master
 | `v0` | [`v2.9.3-patched.0`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.0) | Original July release; archived packages and source |
 | `v1` | [`v2.9.3-patched.1`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.1) | Former patched.3 release; preserved packages and source |
 | `v2` | [`v2.9.3-patched.2`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.2) | Former patched.5 feature set plus the final UI refinements |
+| `v3` | [`v2.9.3-patched.3`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.3) | Independent reseller accounts, multiple/shared inbound assignments and optional inbound editing |
 
 Full release tags also work. If a version or architecture package is unavailable, the installer lists available releases before changing the installation. Enter `y` for the latest release, another version such as `v1`, or `n` to cancel.
 
@@ -67,11 +71,12 @@ Verify downloads against [`SHA256SUMS`](https://github.com/yeasinulhoquetuhin/x-
 
 ## Inbound reseller access
 
-Assign client management without handing over the administrator account:
+Create and manage independent accounts from **Reseller** in the administrator sidebar, directly below Inbounds and above Xray Configs:
 
-1. Open an inbound's three-dot menu and select **Reseller Access**.
-2. Enable access and choose a **Path ID**, username, and password.
-3. Save, then use **Copy Inbound Login URL**. A confirmation appears when copying succeeds.
+1. Select **Create Reseller** and choose a **Path ID**, username, and password.
+2. Select any number of inbounds in the searchable **Assigned Inbounds** picker, or leave it empty.
+3. Leave **Allow Inbound Editing** off for client-only management, or enable it for this account.
+4. Save, then copy the account's login URL using the link button. Successful copies show a confirmation.
 
 For a Path ID of `shop-one`, the login address is:
 
@@ -79,15 +84,19 @@ For a Path ID of `shop-one`, the login address is:
 https://panel.example.com:2053/your-panel-path/shop-one/
 ```
 
-The reseller can create, edit, enable, disable, delete, and reset clients within the assigned inbound. Bulk creation, usage statistics, connection links, QR codes, subscriptions, Traffic Reset, and subscription IP-limit visibility are included. There is no reseller client-count cap.
+The reseller can create, edit, enable, disable, delete, and reset clients within assigned multi-client inbounds. Bulk creation, usage statistics, connection links, QR codes, subscriptions, Traffic Reset, and subscription IP-limit visibility are included. There is no reseller client-count cap.
 
-The administrator retains full control. Inbound configuration, other inbounds, panel settings, server controls, backups, and global live updates remain admin-only. Restrictions are enforced by server-side API checks and separate reseller sessions.
+Each account can have multiple inbounds, and the same inbound can belong to multiple resellers. Sharing an inbound shares its full client list and usage: a client change by one reseller is visible to the others assigned to it. The dashboard's **Total Inbounds** counts only assigned inbounds. An enabled account with no assignments can log in and sees **No inbounds assigned yet.** Assignment changes appear in the open dashboard automatically.
 
-Changing the reseller username, password, or Path ID, disabling access, or deleting the inbound invalidates previous sessions, including open live-update connections. Recent reseller actions are available in the admin access modal.
+**Allow Inbound Editing** defaults to off. When enabled, the reseller can edit configuration and enable/disable assigned inbounds, including access to configuration secrets needed for editing. Inbound edits preserve the latest clients and traffic counters, so a stale editor does not overwrite another reseller's client changes. Inbound creation/deletion, unassigned inbounds, panel settings, server controls and backups remain administrator-only. API checks and separate live-update streams enforce these boundaries.
+
+Changing the reseller username, password, or Path ID, disabling the account, or deleting it invalidates previous sessions, including open live-update connections. Permission/assignment changes take effect without requiring a new login. Deleting an inbound removes its assignments and keeps reseller accounts available. Recent actions, including the affected inbound number, are available from the account's activity button.
+
+Existing V2 per-inbound accounts migrate automatically: login URLs, usernames, password hashes and activity history are preserved, the original inbound becomes an assignment, and inbound editing stays off. Migration runs once and does not recreate deleted accounts or removed assignments on subsequent restarts.
 
 Path IDs and credentials have no arbitrary minimum-length rule. The path must remain a valid, non-empty URL segment and must not conflict with reserved panel routes. Passwords are hashed; an empty password field when editing keeps the existing password.
 
-Client authentication is inbound-scoped: separate inbounds may use the same protocol UUID/password. Client emails/names and subscription IDs remain separate across reseller inbounds so usage and subscription access stay isolated. A conflicting email is identified with its inbound number when saving.
+Client authentication is inbound-scoped: separate inbounds may use the same protocol UUID/password. Client emails/names stay unique for separate traffic accounting. A subscription shared across multiple inbounds requires all those inbounds to be assigned to the account; new clients cannot join another client's subscription. Conflicts identify the inbound when saving assignments.
 
 ## Native IP limits
 

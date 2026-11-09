@@ -1,0 +1,87 @@
+{{ template "page/head_start" .}}
+{{ template "page/head_end" .}}
+{{ template "page/body_start" .}}
+<a-layout id="app" v-cloak :class="themeSwitcher.currentTheme + ' resellers-page'">
+  <a-sidebar></a-sidebar>
+  <a-layout id="content-layout">
+    <a-layout-content>
+      <div class="reseller-heading">
+        <div><h1>Reseller</h1><p>Manage accounts, inbound assignments and permissions.</p></div>
+        <a-space><a-button icon="reload" :loading="loading" @click="load()"></a-button><a-button type="primary" icon="plus" @click="open()">Create Reseller</a-button></a-space>
+      </div>
+      <a-row :gutter="16" style="margin-bottom:20px">
+        <a-col :xs="8"><a-card size="small"><a-statistic title="Total Resellers" :value="accounts.length"><a-icon slot="prefix" type="team"></a-icon></a-statistic></a-card></a-col>
+        <a-col :xs="8"><a-card size="small"><a-statistic title="Enabled" :value="accounts.filter(row => row.enabled).length" :value-style="{color:'#008771'}"></a-statistic></a-card></a-col>
+        <a-col :xs="8"><a-card size="small"><a-statistic title="Without Inbounds" :value="accounts.filter(row => !row.inboundIds.length).length"></a-statistic></a-card></a-col>
+      </a-row>
+      <a-card :bordered="false">
+        <a-input-search v-model="search" placeholder="Search reseller or inbound" style="max-width:340px;margin-bottom:16px" allow-clear></a-input-search>
+        <a-table :columns="columns" :data-source="filtered" :loading="loading" :row-key="row => row.id" :scroll="{x:900}" :pagination="{pageSize:10,hideOnSinglePage:true}" :locale="{emptyText:'No reseller accounts yet.'}">
+          <template slot="account" slot-scope="text,row">
+            <strong>[[row.username]]</strong><br><small style="opacity:.65">/[[row.path]]/ · # [[row.id]]</small>
+          </template>
+          <template slot="enabled" slot-scope="text,row"><a-switch :checked="row.enabled" :loading="busyId===row.id" @change="value => toggle(row,value)" size="small"></a-switch></template>
+          <template slot="assignments" slot-scope="text,row">
+            <span v-if="!row.inboundIds.length" style="opacity:.6">No inbounds assigned</span>
+            <a-tag v-for="id in row.inboundIds" :key="id" style="margin-bottom:4px">[[inboundLabel(id)]]</a-tag>
+          </template>
+          <template slot="editing" slot-scope="text,row"><a-tag :color="row.canEditInbounds ? 'orange' : 'green'">[[row.canEditInbounds ? 'Inbound editing' : 'Clients only']]</a-tag></template>
+          <template slot="actions" slot-scope="text,row">
+            <a-space><a-tooltip title="Edit reseller"><a-button icon="edit" size="small" @click="open(row)"></a-button></a-tooltip><a-tooltip title="Copy Login URL"><a-button :icon="copiedId===row.id ? 'check' : 'link'" size="small" @click="copyURL(row)"></a-button></a-tooltip><a-tooltip title="Activity"><a-button icon="history" size="small" @click="showAudit(row)"></a-button></a-tooltip><a-popconfirm title="Delete this reseller account?" @confirm="remove(row)"><a-button icon="delete" type="danger" size="small"></a-button></a-popconfirm></a-space>
+          </template>
+        </a-table>
+      </a-card>
+      <a-modal v-model="editorVisible" :title="editingId ? 'Edit Reseller' : 'Create Reseller'" :confirm-loading="saving" :class="themeSwitcher.currentTheme" @ok="save()" width="660px" :mask-closable="false">
+        <a-form layout="vertical">
+          <a-row :gutter="24"><a-col :span="12"><a-form-item label="Account enabled"><a-switch v-model="form.enabled"></a-switch></a-form-item></a-col><a-col :span="12"><a-form-item label="Allow Inbound Editing"><a-switch v-model="form.canEditInbounds"></a-switch></a-form-item></a-col></a-row>
+          <a-alert v-if="form.canEditInbounds" type="info" show-icon message="This account can edit configuration and enable/disable every assigned inbound." style="margin-bottom:16px"></a-alert>
+          <a-form-item label="Username"><a-input v-model="form.username" autocomplete="off"></a-input></a-form-item>
+          <a-form-item label="Password"><a-input-password v-model="form.password" autocomplete="new-password" :placeholder="editingId ? 'Leave blank to keep the current password' : 'Choose a password'"></a-input-password></a-form-item>
+          <a-form-item label="Path ID"><a-input v-model.trim="form.path" placeholder="shop-one"></a-input></a-form-item>
+          <a-form-item label="Assigned Inbounds">
+            <a-select v-model="form.inboundIds" mode="multiple" show-search allow-clear :filter-option="filterInbound" placeholder="Choose any number of inbounds" :dropdown-class-name="themeSwitcher.currentTheme" style="width:100%">
+              <a-select-option v-for="inbound in inbounds" :key="inbound.id" :value="inbound.id">[[inboundLabel(inbound.id)]]</a-select-option>
+            </a-select>
+            <small style="opacity:.65">The same inbound can be assigned to multiple resellers. They manage its shared client list.</small>
+          </a-form-item>
+          <a-form-item label="Login URL"><a-input :value="loginURL(form)" readonly><a-icon slot="addonAfter" type="copy" @click="copyURL(form)" style="cursor:pointer"></a-icon></a-input></a-form-item>
+        </a-form>
+      </a-modal>
+      <a-modal v-model="auditVisible" :title="'Activity · ' + auditName" :footer="null" :class="themeSwitcher.currentTheme" width="700px">
+        <a-button size="small" icon="reload" @click="loadAudit()" :loading="auditLoading">Refresh activity</a-button>
+        <a-list :data-source="audit" :loading="auditLoading" size="small" style="margin-top:12px;max-height:420px;overflow:auto">
+          <a-list-item slot="renderItem" slot-scope="item"><div><strong>[[item.username]]</strong> · [[item.action]] <a-tag v-if="item.inboundId">Inbound # [[item.inboundId]]</a-tag><br>[[item.target]]<br><small style="opacity:.65">[[new Date(item.createdAt).toLocaleString()]] · [[item.ip]]</small></div></a-list-item>
+        </a-list>
+      </a-modal>
+    </a-layout-content>
+  </a-layout>
+</a-layout>
+{{ template "page/body_scripts" .}}
+{{ template "component/aSidebar" .}}
+{{ template "component/aThemeSwitch" .}}
+<script>
+const emptyReseller = () => ({enabled:true,canEditInbounds:false,username:'',password:'',path:'',inboundIds:[]});
+const app = new Vue({
+  el:'#app',delimiters:['[[',']]'],data:{themeSwitcher,accounts:[],inbounds:[],loading:false,saving:false,busyId:0,search:'',editorVisible:false,editingId:0,form:emptyReseller(),copiedId:null,copyTimer:null,auditVisible:false,auditName:'',auditId:0,audit:[],auditLoading:false,
+    columns:[{title:'Account',scopedSlots:{customRender:'account'},width:180},{title:'Enabled',scopedSlots:{customRender:'enabled'},width:85},{title:'Assigned Inbounds',scopedSlots:{customRender:'assignments'}},{title:'Permission',scopedSlots:{customRender:'editing'},width:140},{title:'Actions',scopedSlots:{customRender:'actions'},width:190}]
+  },
+  computed:{filtered(){const key=this.search.toLowerCase();return this.accounts.filter(row=>[row.username,row.path,...row.inboundIds.map(id=>this.inboundLabel(id))].join(' ').toLowerCase().includes(key));}},
+  methods:{
+    async load(){this.loading=true;try{const [accounts,inbounds]=await Promise.all([HttpUtil.get('/panel/api/resellers'),HttpUtil.get('/panel/api/inbounds/list')]);if(accounts.success)this.accounts=accounts.obj||[];if(inbounds.success)this.inbounds=inbounds.obj||[];}finally{this.loading=false;}},
+    inboundLabel(id){const inbound=this.inbounds.find(row=>row.id===id);return inbound ? `#${id} · ${inbound.remark || inbound.protocol} · ${inbound.port}` : `#${id}`;},
+    filterInbound(input,option){return this.inboundLabel(option.componentOptions.propsData.value).toLowerCase().includes(input.toLowerCase());},
+    open(row){this.editingId=row?.id||0;this.form=row?{...emptyReseller(),...row,password:'',inboundIds:[...row.inboundIds]}:emptyReseller();this.editorVisible=true;},
+    async save(){this.saving=true;try{const result=await HttpUtil.post('/panel/api/resellers'+(this.editingId?'/'+this.editingId:''),this.form);if(result.success){this.editorVisible=false;this.form.password='';await this.load();}}finally{this.saving=false;}},
+    async toggle(row,enabled){this.busyId=row.id;try{const result=await HttpUtil.post('/panel/api/resellers/'+row.id,{...row,password:'',enabled});if(result.success)await this.load();}finally{this.busyId=0;}},
+    async remove(row){const result=await HttpUtil.post(`/panel/api/resellers/${row.id}/delete`);if(result.success)await this.load();},
+    loginURL(row){return row.path?new URL(basePath+encodeURIComponent(row.path)+'/',location.origin).href:'';},
+    async copyURL(row){const url=this.loginURL(row);if(!url)return;let ok=false;try{ok=await ClipboardManager.copyText(url);}catch(_){}if(!ok){this.$message.error('Copy failed. Please select and copy the login URL.');return;}this.$message.success('Reseller login URL copied');this.copiedId=row.id||0;clearTimeout(this.copyTimer);this.copyTimer=setTimeout(()=>{this.copiedId=null;},2500);},
+    showAudit(row){this.auditId=row.id;this.auditName=row.username;this.audit=[];this.auditVisible=true;this.loadAudit();},
+    async loadAudit(){const id=this.auditId;this.auditLoading=true;try{const result=await HttpUtil.get(`/panel/api/resellers/${id}/audit`);if(result.success&&this.auditId===id)this.audit=result.obj||[];}finally{this.auditLoading=false;}}
+  },mounted(){this.load();}
+});
+</script>
+<style>
+.reseller-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.reseller-heading h1{margin:0;font-size:26px;color:inherit}.reseller-heading p{opacity:.6;margin:4px 0 0}.resellers-page .ant-table td{vertical-align:top}.resellers-page .ant-statistic-title{white-space:normal}@media(max-width:600px){.reseller-heading{align-items:flex-start;flex-direction:column}.resellers-page .ant-statistic-content{font-size:22px}}
+</style>
+{{ template "page/body_end" .}}

@@ -53,64 +53,6 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 	g.POST("/lastOnline", a.lastOnline)
 	g.POST("/updateClientTraffic/:email", a.updateClientTraffic)
 	g.POST("/:id/delClientByEmail/:email", a.delInboundClientByEmail)
-	g.GET("/:id/reseller", a.getResellerAccess)
-	g.POST("/:id/reseller", a.saveResellerAccess)
-	g.GET("/:id/reseller/audit", a.getResellerAudit)
-}
-
-func (a *InboundController) resellerInbound(c *gin.Context) (int, bool) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		pureJsonMsg(c, 400, false, "Invalid inbound ID; reopen Reseller Access from the inbound menu")
-		c.Abort()
-		return 0, false
-	}
-	inbound, err := a.inboundService.GetInbound(id)
-	user := session.GetLoginUser(c)
-	if err != nil || user == nil || inbound.UserId != user.Id {
-		c.AbortWithStatus(403)
-		return 0, false
-	}
-	return id, true
-}
-
-func (a *InboundController) getResellerAccess(c *gin.Context) {
-	id, ok := a.resellerInbound(c)
-	if !ok {
-		return
-	}
-	var reseller service.ResellerService
-	account, err := reseller.Get(id)
-	jsonObj(c, account, err)
-}
-
-func (a *InboundController) saveResellerAccess(c *gin.Context) {
-	id, ok := a.resellerInbound(c)
-	if !ok {
-		return
-	}
-	var form service.ResellerAccessForm
-	if err := c.ShouldBind(&form); err != nil {
-		jsonObj(c, nil, err)
-		return
-	}
-	var reseller service.ResellerService
-	account, err := reseller.Save(id, form)
-	if err != nil {
-		jsonObj(c, nil, err)
-		return
-	}
-	jsonMsgObj(c, "Reseller access saved", account, err)
-}
-
-func (a *InboundController) getResellerAudit(c *gin.Context) {
-	id, ok := a.resellerInbound(c)
-	if !ok {
-		return
-	}
-	var reseller service.ResellerService
-	rows, err := reseller.AuditList(id)
-	jsonObj(c, rows, err)
 }
 
 type CopyInboundClientsRequest struct {

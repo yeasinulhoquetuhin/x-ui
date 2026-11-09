@@ -9,9 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstallerVersionTests(unittest.TestCase):
-    def run_selection(self, requested='', answers='', latest='v2.9.3-patched.2', missing_assets=False):
+    def run_selection(self, requested='', answers='', latest='v2.9.3-patched.3', missing_assets=False):
         published = [dict(tag_name=f'v2.9.3-patched.{number}', draft=False,
-                          assets=[dict(name='x-ui-linux-amd64.tar.gz')]) for number in range(3)]
+                          assets=[dict(name='x-ui-linux-amd64.tar.gz')]) for number in range(4)]
         if missing_assets:
             published[1]['assets'] = []
         with tempfile.TemporaryDirectory() as directory:
@@ -47,10 +47,10 @@ if xui_select_version "$2"; then printf 'SELECTED=%s\n' "$tag_version"; else exi
     def test_default_installs_latest(self):
         result = self.run_selection()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('SELECTED=v2.9.3-patched.2', result.stdout)
+        self.assertIn('SELECTED=v2.9.3-patched.3', result.stdout)
 
     def test_shortcuts_and_full_tag(self):
-        for version in ('v0', 'v1', 'v2', 'v2.9.3-patched.2'):
+        for version in ('v0', 'v1', 'v2', 'v3', 'v2.9.3-patched.3'):
             result = self.run_selection(version)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             expected = version if 'patched' in version else 'v2.9.3-patched.' + version[1:]
@@ -61,7 +61,8 @@ if xui_select_version "$2"; then printf 'SELECTED=%s\n' "$tag_version"; else exi
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('not available', result.stdout)
         self.assertIn('v2  -  v2.9.3-patched.2', result.stdout)
-        self.assertIn('SELECTED=v2.9.3-patched.2', result.stdout)
+        self.assertIn('v3  -  v2.9.3-patched.3', result.stdout)
+        self.assertIn('SELECTED=v2.9.3-patched.3', result.stdout)
 
     def test_missing_version_can_select_another(self):
         result = self.run_selection('v9', 'v8\nv2\n')

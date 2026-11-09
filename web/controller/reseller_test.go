@@ -28,11 +28,11 @@ func TestResellerSessionScopeAndRevocation(t *testing.T) {
 		}
 	}
 	var reseller service.ResellerService
-	first, err := reseller.Save(1, service.ResellerAccessForm{Enabled: true, Path: "shop-one", Username: "shop", Password: "shop-password"})
+	first, err := reseller.Save(1, 0, service.ResellerAccessForm{Enabled: true, Path: "shop-one", Username: "shop", Password: "shop-password", InboundIDs: []int{1}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = reseller.Save(2, service.ResellerAccessForm{Enabled: true, Path: "shop-two", Username: "shop", Password: "other-password"})
+	_, err = reseller.Save(1, 0, service.ResellerAccessForm{Enabled: true, Path: "shop-two", Username: "shop", Password: "other-password", InboundIDs: []int{2}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,29 @@ func TestResellerSessionScopeAndRevocation(t *testing.T) {
 	if response := request("POST", "/test/shop-one/panel/api/inbounds/addClient", url.Values{"id": {"2"}, "settings": {`{"clients":[]}`}}, auth); response.Code != 403 {
 		t.Fatal("foreign inbound write not denied", response.Code)
 	}
-	_, err = reseller.Save(1, service.ResellerAccessForm{Enabled: true, Path: first.Path, Username: first.Username, Password: "changed-password"})
+	for _, path := range []string{"update/1", "toggle/1"} {
+		if response := request("POST", "/test/shop-one/panel/api/inbounds/"+path, url.Values{"enabled": {"false"}}, auth); response.Code != 403 {
+			t.Fatal("default inbound edit permission was not enforced", path, response.Code)
+		}
+	}
+	_, err = reseller.Save(1, first.ID, service.ResellerAccessForm{Enabled: true, Path: first.Path, Username: first.Username, InboundIDs: []int{1, 2}, CanEditInbounds: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response := request("GET", "/test/shop-one/panel/api/inbounds/list", nil, auth); response.Code != 200 || !strings.Contains(response.Body.String(), `"tag":"two"`) {
+		t.Fatal("assignment addition did not apply to current session", response.Body.String())
+	}
+	_, err = reseller.Save(1, first.ID, service.ResellerAccessForm{Enabled: true, Path: first.Path, Username: first.Username})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response := request("GET", "/test/shop-one/panel/api/inbounds/list", nil, auth); response.Code != 200 || !strings.Contains(response.Body.String(), `"obj":[]`) {
+		t.Fatal("zero-assignment session failed", response.Body.String())
+	}
+	if response := request("POST", "/test/shop-one/panel/api/inbounds/addClient", url.Values{"id": {"1"}}, auth); response.Code != 403 {
+		t.Fatal("removed inbound remained writable", response.Code)
+	}
+	_, err = reseller.Save(1, first.ID, service.ResellerAccessForm{Enabled: true, Path: first.Path, Username: first.Username, Password: "changed-password", InboundIDs: []int{1}})
 	if err != nil {
 		t.Fatal(err)
 	}

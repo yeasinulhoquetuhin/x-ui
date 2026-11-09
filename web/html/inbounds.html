@@ -24,7 +24,7 @@
             <a-col>
               <a-card size="small" :style="{ padding: '16px' }" hoverable>
                 <a-row>
-                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
+                  <a-col :sm="12" :md="5">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.totalDownUp" }}'
                       :value="`${SizeFormatter.sizeFormat(total.up)} / ${SizeFormatter.sizeFormat(total.down)}`">
@@ -33,7 +33,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
+                  <a-col :sm="12" :md="5">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.totalUsage" }}'
                       :value="SizeFormatter.sizeFormat(total.up + total.down)"
@@ -43,7 +43,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
+                  <a-col :sm="12" :md="5">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.allTimeTrafficUsage" }}'
                       :value="SizeFormatter.sizeFormat(total.allTime)"
@@ -53,7 +53,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  {{if not .is_reseller}}<a-col :sm="12" :md="5">
+                  <a-col :sm="12" :md="5">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.inboundCount" }}'
                       :value="dbInbounds.length"
@@ -63,7 +63,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  {{end}}<a-col :sm="12" :md="{{if .is_reseller}}6{{else}}4{{end}}">
+                  <a-col :sm="12" :md="4">
                     <a-custom-statistic title='{{ i18n "clients" }}' value=" "
                       :style="{ marginTop: isMobile ? '10px' : 0 }">
                       <template #prefix>
@@ -229,7 +229,8 @@
                         }}</a-radio-button>
                     </a-radio-group>
                   </div>
-                  <a-table :columns="isMobile ? mobileColumns : columns"
+                  {{if .is_reseller}}<a-empty v-if="dbInbounds.length === 0" description="No inbounds assigned yet." style="padding:36px 0"></a-empty>{{end}}
+                  <a-table {{if .is_reseller}}v-else{{end}} :columns="isMobile ? mobileColumns : columns"
                     :row-key="dbInbound => dbInbound.id"
                     :data-source="searchedInbounds"
                     :scroll="isMobile ? {} : { x: 1000 }"
@@ -246,18 +247,10 @@
                         <a-menu slot="overlay"
                           @click="a => clickAction(a, dbInbound)"
                           :theme="themeSwitcher.currentTheme">
-                          {{if not .is_reseller}}
-                          <a-menu-item key="resellerAccess">
-                            <a-icon type="team"></a-icon>Reseller Access
-                          </a-menu-item>
-                          <a-menu-item key="copyResellerPath">
-                            <a-icon type="link"></a-icon>Copy Inbound Login URL
-                          </a-menu-item>
-                          <a-menu-item key="edit">
+                          <a-menu-item key="edit" v-if="canEditInbounds">
                             <a-icon type="edit"></a-icon>
                             {{ i18n "edit" }}
                           </a-menu-item>
-                          {{end}}
                           <a-menu-item key="qrcode"
                             v-if="(dbInbound.isSS && !dbInbound.toInbound().isSSMultiUser) || dbInbound.isWireguard">
                             <a-icon type="qrcode"></a-icon>
@@ -319,12 +312,12 @@
                               <a-icon type="delete"></a-icon> {{ i18n "delete"}}
                             </span>
                           </a-menu-item>
-                          <a-menu-item v-if="isMobile">
+                          {{end}}
+                          <a-menu-item v-if="isMobile && canEditInbounds">
                             <a-switch size="small" v-model="dbInbound.enable"
                               @change="switchEnable(dbInbound.id,dbInbound.enable)"></a-switch>
                             {{ i18n "pages.inbounds.enable" }}
                           </a-menu-item>
-                          {{end}}
                         </a-menu>
                       </a-dropdown>
                     </template>
@@ -492,7 +485,7 @@
                         ]]</a-tag>
                     </template>
                     <template slot="enable" slot-scope="text, dbInbound">
-                      <a-switch {{if .is_reseller}}disabled{{end}} v-model="dbInbound.enable"
+                      <a-switch :disabled="!canEditInbounds" v-model="dbInbound.enable"
                         @change="switchEnable(dbInbound.id,dbInbound.enable)"></a-switch>
                     </template>
                     <template slot="expiryTime" slot-scope="text, dbInbound">
@@ -792,7 +785,6 @@
 {{template "modals/inboundInfoModal"}}
 {{template "modals/clientsModal"}}
 {{template "modals/clientsBulkModal"}}
-{{if not .is_reseller}}{{template "modals/resellerAccess" .}}{{end}}
 <a-modal id="copy-clients-modal"
   :title="copyClientsModal.title"
   :visible="copyClientsModal.visible"
@@ -1104,6 +1096,8 @@
     mixins: [MediaQueryMixin],
     data: {
       themeSwitcher,
+      isReseller: {{if .is_reseller}}true{{else}}false{{end}},
+      canEditInbounds: {{if .is_reseller}}false{{else}}true{{end}},
       persianDatepicker,
       loadingStates: {
         fetched: false,
@@ -1193,6 +1187,7 @@
         this.remarkModel = settings.remarkModel;
         this.datepicker = settings.datepicker;
         this.ipLimitEnable = settings.ipLimitEnable;
+        if (this.isReseller) this.canEditInbounds = !!settings.canEditInbounds;
       },
       setInbounds(dbInbounds) {
         this.inbounds.splice(0);
@@ -1347,10 +1342,6 @@
       },
       clickAction(action, dbInbound) {
         switch (action.key) {
-          {{if not .is_reseller}}
-          case "resellerAccess": resellerAccessModal.show(dbInbound); break;
-          case "copyResellerPath": resellerAccessModal.copyPath(dbInbound); break;
-          {{end}}
           case "qrcode":
             this.showQrcode(dbInbound.id);
             break;
@@ -1442,6 +1433,7 @@
         });
       },
       openEditInbound(dbInboundId) {
+        if (!this.canEditInbounds) return;
         dbInbound = this.dbInbounds.find(row => row.id === dbInboundId);
         const inbound = dbInbound.toInbound();
         inModal.show({
@@ -1698,6 +1690,10 @@
         infoModal.show(newDbInbound, index);
       },
       switchEnable(dbInboundId, state) {
+        if (!this.canEditInbounds) return;
+        if (this.isReseller) {
+          return this.submit(`/panel/api/inbounds/toggle/${dbInboundId}`, {enabled:state});
+        }
         let dbInbound = this.dbInbounds.find(row => row.id === dbInboundId);
         if (!dbInbound) return;
         dbInbound.enable = state;
@@ -2054,12 +2050,25 @@
       // Setup WebSocket for real-time updates
       if (window.wsClient) {
         window.wsClient.connect();
+        if (this.isReseller) {
+          window.wsClient.on('resellerAccess', payload => {
+            this.canEditInbounds = !!payload?.canEditInbounds;
+            if (!this.canEditInbounds && inModal.visible) inModal.close();
+          });
+        }
         
         // Listen for inbounds updates
         window.wsClient.on('inbounds', (payload) => {
           if (payload && Array.isArray(payload)) {
             // Use setInbounds to properly convert to DBInbound objects with methods
             this.setInbounds(payload);
+            if (this.isReseller) {
+              const assigned = new Set(payload.map(row => row.id));
+              if (inModal.visible && !assigned.has(inModal.dbInbound.id)) inModal.close();
+              if (clientModal.visible && !assigned.has(clientModal.dbInbound.id)) clientModal.close();
+              if (infoModal.visible && !assigned.has(infoModal.dbInbound.id)) infoModal.close();
+              if (clientsBulkModal.visible && !assigned.has(clientsBulkModal.dbInbound.id)) clientsBulkModal.close();
+            }
           }
         });
 

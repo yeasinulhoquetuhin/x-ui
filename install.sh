@@ -862,7 +862,7 @@ xui_select_version() {
     echo -e "${yellow}Version ${requested} (${candidate}) is not available for $(arch).${plain}"
     echo -e "${green}Latest available: ${latest}${plain}"
     catalog=$(xui_release_json '?per_page=100' | xui_release_tags)
-    echo "Available versions (enter v0, v1, v2, or a full release tag):"
+    echo "Available versions (enter v0, v1, v2, v3, or a full release tag):"
     while IFS= read -r tag; do
         [[ -n "$tag" ]] || continue
         if [[ "$tag" =~ ^v2\.9\.3-patched\.([0-9]+)$ ]]; then echo "  v${BASH_REMATCH[1]}  -  $tag"; else echo "  $tag"; fi

@@ -1,55 +1,38 @@
-# TDZ X-UI v2.9.3-patched.2
+# TDZ X-UI v2.9.3-patched.3
 
-## Reseller and IP-details hotfix
+## Independent reseller accounts
 
-- Allow the same protocol UUID/password on separate inbounds. Reseller activation and client edits now respect inbound-scoped authentication while keeping client emails and subscriptions isolated.
-- Identify the conflicting client email and inbound when a real accounting conflict exists. Failed reseller saves no longer display a success prefix.
-- Clear IP records without automatically refreshing them in client details or the editor. Ignore older in-flight detail refreshes after clearing; use Refresh to fetch connected IPs again.
-- Remove the requested Traffic Reset details explanation and subscription IP-limit helper text.
+- Manage accounts from **Reseller** in the administrator sidebar, below Inbounds and above Xray Configs. Create, edit, enable/disable, delete, copy login URLs and inspect account activity from one page.
+- Assign any number of inbounds through a searchable multi-select. Multiple resellers can share an inbound and its client list/usage.
+- Enabled accounts with no assignments can log in and see **Total Inbounds: 0** and **No inbounds assigned yet.** Assignments and counts update in open dashboards.
+- **Allow Inbound Editing** defaults to off. Enable it per account to allow configuration edits and inbound enable/disable for every assigned inbound. Inbound creation/deletion and panel/server administration remain admin-only.
+- Shared inbound configuration edits preserve the latest clients and traffic counters. Permission and assignment changes are checked server-side and reflected in scoped live updates.
 
-## Final UI refinements
+## V2 migration
 
-- Remove the extra reseller-name/dashboard badge and Total Inbounds statistic from the reseller view. Administrator overview statistics stay available.
-- Confirm successful inbound-login-URL copies with a toast, inline text, and a temporary check icon. Copy failures are reported.
-- Show each client's Traffic Reset cycle and next reset time in client details, including the first-use state for delayed-start accounts.
+Existing per-inbound reseller accounts migrate automatically, preserving their URL path, username, password hash, authentication version and activity. Their original inbound becomes an assignment and inbound editing defaults to off. Migration is idempotent: removed assignments/deleted accounts are not recreated on restart. Removing an inbound keeps its reseller accounts available.
 
-## Features included
+Credentials and account enable/disable changes revoke existing HTTP/WebSocket sessions. Assignment and editing-permission changes apply without a new login. Activity is recorded by reseller account with the affected inbound ID.
 
-- Per-inbound reseller login with editable Path ID/credentials, server-side client scope checks, separate sessions, revocation, and admin-visible activity. No client-count cap.
-- Native per-client IP admission in the bundled Xray core. First admitted IPs retain their slots; excess IPs are rejected. Live IP details refresh manually.
-- Opt-in subscription-page IP-limit tags: green below capacity, red when full, orange if statistics are unavailable.
-- Hourly, 12-hourly, daily, weekly, monthly, and custom-day Traffic Reset schedules. Quota, all-time usage, and fixed expiry remain unchanged.
-- X-UI Payload Proxy in CLI menu 4. Installation creates/imports no proxy instances; individual proxy management remains available.
-- Settings-preserving updates, rollback backups, Telegram-ID compatibility, and panel/reseller session invalidation when credentials change.
+## Features retained
 
-## Version layout
-
-| Shortcut | Release | History |
-| --- | --- | --- |
-| `v0` | `v2.9.3-patched.0` | Original July 2026 release |
-| `v1` | `v2.9.3-patched.1` | Former patched.3 packages/source |
-| `v2` | `v2.9.3-patched.2` | Former patched.5 plus these final refinements |
-
-These are the three published versions. Historical package contents are preserved and may report their original embedded build number.
+- Native per-client source-IP admission in the bundled Xray `26.4.25`, identified as `TDZ-IPLimit/2`, including real-IP handling through the bundled payload proxy and live IP reporting.
+- Client IP **Clear** and **Refresh** remain independent; older in-flight refreshes cannot repopulate a cleared details view.
+- Per-client subscription IP-limit tags and hourly/12-hourly/daily/weekly/monthly/custom Traffic Reset schedules.
+- Settings-preserving updates, rollback backups, Telegram-ID compatibility and CLI menu 4's X-UI Payload Proxy.
 
 ## Install or update
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v3
 ```
 
-Append `v0`, `v1`, or `v2` to select a version explicitly. No argument installs the latest available architecture package. An unavailable version presents the release list and lets you choose another version, install the latest, or cancel.
+No argument selects the latest available architecture package. `v0`, `v1`, `v2`, `v3` and full release tags are supported. Historical V0/V1/V2 releases remain available.
 
-## Packages and source
+## Packages and verification
 
-The current release provides Linux amd64, arm64, 386, ARMv5/v6/v7, and s390x packages, plus Windows amd64. Each platform includes its matching patched core. `x-ui-mod-source.tar.gz` contains the matching panel source, original pinned core source, patcher, and tests. Verify assets against `SHA256SUMS`.
+Linux amd64, arm64, 386, ARMv5/v6/v7 and s390x, plus Windows amd64, include matching patched cores. `x-ui-mod-source.tar.gz` contains matching panel source, tests, pinned original core source and patches. Verify assets against `SHA256SUMS`.
 
-## Verification
+Verification covers V2 database migration/restart behavior; Go race tests, vet/staticcheck; installer/client models; real browser management and live permission changes; multi/shared/zero-inbound access; scoped client/traffic operations; and platform package/version/digest checks.
 
-- Go tests with race detection, vet, and static analysis.
-- Installer preservation/rollback, version shortcuts, cancellation, and menu-only updates.
-- Actual browser controls for reseller access, copied-URL feedback, scoped clients, Traffic Reset details, and credential revocation.
-- Real authenticated connection checks for subscription counts and native IP admission, including MUX and payload-proxy cases.
-- Cross-platform builds, version smoke checks, archive contents, and published download digests.
-
-IP limits count real source addresses, not physical devices. One shared public IP occupies one slot. Remote proxies require correctly configured real-IP forwarding.
+IP limits count source addresses, not physical devices. Devices sharing a public IP occupy one slot.

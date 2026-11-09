@@ -381,7 +381,7 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("inbound_id = ?", id).Delete(&model.ResellerAccess{}).Error; err != nil {
+		if err := tx.Where("inbound_id = ?", id).Delete(&model.ResellerInbound{}).Error; err != nil {
 			return err
 		}
 		return tx.Delete(model.Inbound{}, id).Error
