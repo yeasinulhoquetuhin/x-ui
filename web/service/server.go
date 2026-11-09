@@ -594,7 +594,7 @@ func (s *ServerService) downloadXRay(version string) (string, error) {
 	if !regexp.MustCompile(`^v[0-9][A-Za-z0-9._-]*$`).MatchString(version) {
 		return "", fmt.Errorf("invalid release version")
 	}
-	fileName := "tdz-" + xray.GetBinaryName()
+	fileName := "tdz-" + xray.GetReleaseBinaryName()
 	url := fmt.Sprintf("https://github.com/yeasinulhoquetuhin/x-ui/releases/download/%s/%s", version, fileName)
 	client := &http.Client{Timeout: 3 * time.Minute}
 	resp, err := client.Get(url)

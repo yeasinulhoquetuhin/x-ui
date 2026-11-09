@@ -541,11 +541,11 @@ class ClipboardManager {
                 window.document.body.appendChild(textarea);
 
                 textarea.select();
-                window.document.execCommand("copy");
+                const copied = window.document.execCommand("copy");
 
                 window.document.body.removeChild(textarea);
 
-                resolve(true)
+                resolve(copied)
             } catch {
                 resolve(false)
             }

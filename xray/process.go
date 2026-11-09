@@ -21,8 +21,17 @@ import (
 )
 
 // GetBinaryName returns the Xray binary filename for the current OS and architecture.
+var armVariant string // Set by release builds to armv5/armv6/armv7 for core updates.
+
 func GetBinaryName() string {
 	return fmt.Sprintf("xray-%s-%s", runtime.GOOS, runtime.GOARCH)
+}
+
+func GetReleaseBinaryName() string {
+	if runtime.GOARCH == "arm" && (armVariant == "armv5" || armVariant == "armv6" || armVariant == "armv7") {
+		return fmt.Sprintf("xray-%s-%s", runtime.GOOS, armVariant)
+	}
+	return GetBinaryName()
 }
 
 // GetBinaryPath returns the full path to the Xray binary executable.

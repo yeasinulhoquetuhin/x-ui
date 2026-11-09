@@ -198,6 +198,23 @@
               ]] ↓</a-tag>
           </td>
         </tr>
+        <tr class="client-traffic-reset-details">
+          <td>Traffic Reset</td>
+          <td>
+            <a-tag :color="isTrafficResetEnabled() ? 'green' : undefined">[[ trafficResetLabel() ]]</a-tag>
+            <template v-if="isTrafficResetEnabled()">
+              <div style="margin-top:6px;font-size:12px;line-height:1.7">
+                <span style="opacity:.7">Next reset:</span>
+                <span v-if="infoModal.clientStats && infoModal.clientStats.nextTrafficReset > 0">
+                  [[ IntlUtil.formatDate(infoModal.clientStats.nextTrafficReset) ]]
+                </span>
+                <span v-else-if="infoModal.clientSettings.expiryTime < 0">Starts after first use</span>
+                <span v-else>Pending schedule</span>
+              </div>
+              <small style="display:block;opacity:.7;white-space:normal">Resets used traffic only; quota and account expiry stay the same.</small>
+            </template>
+          </td>
+        </tr>
         <tr>
           <td>{{ i18n "pages.inbounds.createdAt" }}</td>
           <td>
@@ -733,6 +750,16 @@
       },
     },
     methods: {
+      isTrafficResetEnabled() {
+        const period = this.infoModal.clientSettings?.trafficReset;
+        return !!period && period !== 'never';
+      },
+      trafficResetLabel() {
+        const client = this.infoModal.clientSettings || {};
+        const labels = { hourly: 'Hourly', '12hourly': 'Every 12 hours', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+        if (client.trafficReset === 'custom') return `Every ${client.trafficResetDays || 0} days`;
+        return labels[client.trafficReset] || 'Disabled';
+      },
       getActiveIpCount() {
         if (!this.infoModal.clientIpsArray || !Array.isArray(this.infoModal.clientIpsArray)) {
           return 0;

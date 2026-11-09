@@ -24,7 +24,7 @@
             <a-col>
               <a-card size="small" :style="{ padding: '16px' }" hoverable>
                 <a-row>
-                  <a-col :sm="12" :md="5">
+                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.totalDownUp" }}'
                       :value="`${SizeFormatter.sizeFormat(total.up)} / ${SizeFormatter.sizeFormat(total.down)}`">
@@ -33,7 +33,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="5">
+                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.totalUsage" }}'
                       :value="SizeFormatter.sizeFormat(total.up + total.down)"
@@ -43,7 +43,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="5">
+                  <a-col :sm="12" :md="{{if .is_reseller}}6{{else}}5{{end}}">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.allTimeTrafficUsage" }}'
                       :value="SizeFormatter.sizeFormat(total.allTime)"
@@ -53,7 +53,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="5">
+                  {{if not .is_reseller}}<a-col :sm="12" :md="5">
                     <a-custom-statistic
                       title='{{ i18n "pages.inbounds.inboundCount" }}'
                       :value="dbInbounds.length"
@@ -63,7 +63,7 @@
                       </template>
                     </a-custom-statistic>
                   </a-col>
-                  <a-col :sm="12" :md="4">
+                  {{end}}<a-col :sm="12" :md="{{if .is_reseller}}6{{else}}4{{end}}">
                     <a-custom-statistic title='{{ i18n "clients" }}' value=" "
                       :style="{ marginTop: isMobile ? '10px' : 0 }">
                       <template #prefix>
@@ -127,9 +127,7 @@
               <a-card hoverable>
                 <template #title>
                   <a-space direction="horizontal">
-                    {{if .is_reseller}}
-                    <a-tag color="green">Reseller Dashboard · {{.reseller_name}}</a-tag>
-                    {{else}}
+                    {{if not .is_reseller}}
                     <a-button type="primary" icon="plus"
                       @click="openAddInbound">
                       <template v-if="!isMobile">{{ i18n

@@ -16,9 +16,10 @@
     </a-form-item>
     <a-form-item label="Inbound Login URL">
       <a-input :value="resellerAccessModal.url" readonly>
-        <a-icon slot="addonAfter" type="copy" @click="resellerAccessModal.copyURL()" style="cursor:pointer"></a-icon>
+        <a-icon slot="addonAfter" :type="resellerAccessModal.copied ? 'check' : 'copy'" @click="resellerAccessModal.copyURL()" style="cursor:pointer;color:#008771"></a-icon>
       </a-input>
-      <small>Save changes before sharing this URL.</small>
+      <small v-if="resellerAccessModal.copied" style="color:#008771">Login URL copied.</small>
+      <small v-else>Save changes before sharing this URL.</small>
     </a-form-item>
   </a-form>
   <a-collapse>
@@ -35,7 +36,7 @@
 </a-modal>
 <script>
   const resellerAccessModal = {
-    visible: false, saving: false, inboundId: 0, audit: [],
+    visible: false, saving: false, inboundId: 0, audit: [], copied: false, copyTimer: null,
     form: {enabled:false,path:'',username:'',password:''},
     url: '',
     updateURL() { this.url = this.form.path ? new URL(basePath + encodeURIComponent(this.form.path) + '/', location.origin).href : ''; },
@@ -47,6 +48,7 @@
       this.form = {enabled:!!saved.enabled,path:saved.path || '',username:saved.username || '',password:''};
       this.updateURL();
       this.audit = [];
+      this.copied = false;
       this.visible = true;
     },
     async save() {
@@ -56,12 +58,21 @@
         if (response.success) { this.form.password = ''; this.visible = false; }
       } finally { this.saving = false; }
     },
-    copyURL() { if (this.url) ClipboardManager.copyText(this.url); },
+    async confirmCopy(url) {
+      let success = false;
+      try { success = await ClipboardManager.copyText(url); } catch (_) { }
+      if (!success) { app.$message.error('Copy failed. Please select and copy the login URL.'); return; }
+      clearTimeout(this.copyTimer);
+      this.copied = true;
+      app.$message.success('Inbound login URL copied');
+      this.copyTimer = setTimeout(() => { this.copied = false; }, 3000);
+    },
+    copyURL() { if (this.url) return this.confirmCopy(this.url); },
     async copyPath(inbound) {
       const response = await HttpUtil.get(`/panel/api/inbounds/${inbound.id}/reseller`);
       if (!response.success) return;
       if (!response.obj?.enabled || !response.obj?.path) { app.$message.info('Enable Reseller Access and save its Path ID first.'); return; }
-      ClipboardManager.copyText(new URL(basePath + encodeURIComponent(response.obj.path) + '/', location.origin).href);
+      await this.confirmCopy(new URL(basePath + encodeURIComponent(response.obj.path) + '/', location.origin).href);
     },
     async loadAudit() {
       const response = await HttpUtil.get(`/panel/api/inbounds/${this.inboundId}/reseller/audit`);

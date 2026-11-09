@@ -82,6 +82,11 @@ jobs:
         platform:
           - amd64
           - arm64
+          - 386
+          - armv5
+          - armv6
+          - armv7
+          - s390x
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -121,7 +126,7 @@ jobs:
           export CC=$(realpath "$(find "$TOOLCHAIN_DIR/bin" -name '*-gcc.br_real' -type f -executable | head -n1)")
           [ -z "$CC" ] && { echo "No gcc.br_real found in $TOOLCHAIN_DIR/bin" >&2; exit 1; }
           cd -
-          go build -ldflags "-w -s -linkmode external -extldflags '-static'" -o xui-release -v main.go
+          go build -ldflags "-w -s -linkmode external -extldflags '-static' -X github.com/mhsanaei/3x-ui/v2/xray.armVariant=${{ matrix.platform }}" -o xui-release -v main.go
           file xui-release
           ldd xui-release || echo "Static binary confirmed"
 
@@ -143,6 +148,7 @@ jobs:
             wget -q "https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/$asset"
           done
           mv xray xray-linux-${{ matrix.platform }}
+          if [[ "$GOARCH" == arm ]]; then mv xray-linux-${{ matrix.platform }} xray-linux-arm; fi
           cd ../..
 
       - name: Package

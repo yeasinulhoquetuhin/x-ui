@@ -6,7 +6,8 @@ within this module resolve to the local source tree, not a downloaded panel.
 
 Release assets include:
 
-- `x-ui-linux-amd64.tar.gz` and `x-ui-linux-arm64.tar.gz`
+- Linux packages for amd64, arm64, 386, armv5, armv6, armv7 and s390x
+- `x-ui-windows-amd64.zip`
 - `x-ui-mod-source.tar.gz` (panel source, patches, tests and core source archive)
 - `xray-core-v26.4.25-source.tar.gz` (pinned source, original LICENSE retained)
 - The six bundled GeoIP/GeoSite datasets and `SHA256SUMS`
@@ -32,10 +33,10 @@ creating or importing instances. Access it with **x-ui → 4. Payload / Proxy**.
 Existing instances stay unchanged. Legacy migration is explicit using the
 setup helper's `--migrate-existing` flag, with rollback on failed service startup.
 
-`tdzp-client-ip.py` remains a compatibility helper for the legacy 1.2 relay with a private
+`tdzp-client-ip.py` remains an explicitly invoked compatibility helper for the legacy 1.2 relay with a private
 per-socket real-IP channel for `TDZ-IPLimit/2`. It preserves payload handshakes
-and every relayed byte. The panel installer applies it to an installed TDZP
-script, saves a rollback copy, and restarts active proxy instances. Live records
+and every relayed byte. When invoked, it saves a rollback copy of the legacy
+script and can restart active proxy instances. Live records
 are stored under `/run/tdzp-client-ips` (0700), checked against `/proc/PID/fd/FD`,
 and removed when the backend socket closes. No client configuration change is
 required. Use the same `TDZ_XRAY_PROXY_IP_DIR` for both processes when overriding

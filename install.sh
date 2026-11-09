@@ -862,7 +862,7 @@ xui_select_version() {
     echo -e "${yellow}Version ${requested} (${candidate}) is not available for $(arch).${plain}"
     echo -e "${green}Latest available: ${latest}${plain}"
     catalog=$(xui_release_json '?per_page=100' | xui_release_tags)
-    echo "Available versions (enter a shortcut such as v4, or a full tag):"
+    echo "Available versions (enter v0, v1, v2, or a full release tag):"
     while IFS= read -r tag; do
         [[ -n "$tag" ]] || continue
         if [[ "$tag" =~ ^v2\.9\.3-patched\.([0-9]+)$ ]]; then echo "  v${BASH_REMATCH[1]}  -  $tag"; else echo "  $tag"; fi
@@ -871,7 +871,7 @@ xui_select_version() {
         read -rp "Install ${latest}? [y/n], or enter another version: " choice || return 1
         case "$choice" in
             y|Y|yes|YES) tag_version="$latest"; return 0 ;;
-            n|N|no|NO|0) echo "Installation cancelled."; return 1 ;;
+            n|N|no|NO) echo "Installation cancelled."; return 1 ;;
             '') continue ;;
         esac
         candidate=$(xui_normalize_version "$choice") || { echo "Invalid version: $choice"; continue; }
@@ -931,7 +931,9 @@ install_x-ui() {
     
     # Check the system's architecture and rename the file accordingly
     if [[ $(arch) == "armv5" || $(arch) == "armv6" || $(arch) == "armv7" ]]; then
-        mv bin/xray-linux-$(arch) bin/xray-linux-arm
+        if [[ -f "bin/xray-linux-$(arch)" ]]; then
+            mv "bin/xray-linux-$(arch)" bin/xray-linux-arm
+        fi
         chmod +x bin/xray-linux-arm
     fi
     chmod +x x-ui
