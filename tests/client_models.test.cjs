@@ -11,12 +11,14 @@ vm.runInContext(fs.readFileSync(path.join(root, 'web/assets/js/model/inbound.js'
 
 for (const [settings, name] of [['VmessSettings', 'VMESS'], ['VLESSSettings', 'VLESS'], ['TrojanSettings', 'Trojan'], ['ShadowsocksSettings', 'Shadowsocks'], ['HysteriaSettings', 'Hysteria']]) {
   test(`${settings} preserves automatic traffic-reset settings`, () => {
-    const input = { email: 'client', enable: true, tgId: '-1001234567890', trafficReset: 'custom', trafficResetDays: 15, limitIp: 1, created_at: 12, updated_at: 34 };
+    const input = { email: 'client', enable: true, tgId: '-1001234567890', trafficReset: 'custom', trafficResetDays: 15, showIpLimit: true, limitIp: 1, created_at: 12, updated_at: 34 };
     const client = context.Inbound[settings][name].fromJson(input);
     const json = client.toJson();
     assert.equal(json.trafficReset, 'custom');
     assert.equal(json.trafficResetDays, 15);
     assert.equal(json.limitIp, 1);
+    assert.equal(json.showIpLimit, true);
+    assert.equal(new context.Inbound[settings][name]().showIpLimit, false);
     assert.equal(json.created_at, 12);
     assert.equal(json.updated_at, 34);
     assert.equal(json.tgId, '-1001234567890');

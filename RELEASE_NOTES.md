@@ -1,6 +1,13 @@
-# TDZ X-UI v2.9.3-patched.3
+# TDZ X-UI v2.9.3-patched.4
 
-- Fix TDZ payload-proxy client IPs using a private, live-socket-validated IP channel. Payload handshake, relay bytes and proxy ports are preserved.
+- Inbound three-dot menu: **Reseller Access** and **Copy Inbound Login URL**. Configure a unique custom Path ID, username and password for each multi-client inbound.
+- Separate reseller login/session grants client management for the assigned inbound only. Other inbounds, inbound editing, server controls, panel settings, backups and admin live broadcasts are inaccessible. Admins retain all inbound/client controls; no maximum-client cap is added.
+- Passwords are hashed. Editing access credentials/path, disabling access or deleting the inbound revokes existing reseller sessions and live updates. Recent reseller client actions are visible to the admin.
+- **Show IP Limit on Subscription Page** is a per-client switch in both admin and reseller editors, including bulk creation. The opt-in row appears directly after Total Quota and shows current slots such as `0/2` or `1/2`. It defaults to off and does not expose client IP addresses.
+- **X-UI Payload Proxy** is built into **x-ui menu 4**, replacing Legacy Version. Create/list/edit/start/stop/restart/delete proxies and view logs. Existing legacy proxy ports/settings are migrated with rollback on failed service startup.
+- Menu Install and Update use this repository's `install.sh`; Update Menu updates only the menu scripts. IP details use the existing manual Refresh button.
+
+- Payload-proxy client IPs use a private, live-socket-validated IP channel. Payload handshake, relay bytes and proxy ports are preserved.
 - Limited accounts reject unresolved local/private proxy sources instead of treating all proxied devices as one IP. New IPs are rejected while slots are full; the first admitted IP remains connected.
 - HTTP forwarded-IP headers are trusted only from explicitly configured proxy peers; direct connections and unconfigured payload relays cannot choose their counted IP through client-supplied headers.
 - Client details load live IPs/counts once when opened; use the Refresh button for subsequent updates. Failed tracking is shown as unavailable, and clearing the display cannot conceal an active IP.
@@ -31,6 +38,9 @@ Both `x-ui-linux-amd64.tar.gz` and `x-ui-linux-arm64.tar.gz` contain the matchin
 
 ## Verified
 
+- Isolated reseller API authorization and browser workflow: admin access settings, custom-path login, scoped client create/edit/bulk/delete/reset, protected inbound fields, separate sessions, live-update isolation and credential revocation.
+- Subscription web-page opt-in/opt-out and live count `0/2` → `1/2` using a real authenticated stream.
+- Built-in proxy migration preserves ports; failed startup restores the original service. Menu-only updates preserve the panel executable and do not invoke the installer.
 - Panel unit/integration tests, shuffled race tests and `go vet`.
 - Installer preservation, invalid-archive handling and failed-migration rollback.
 - Client UI model round trips and empty/error IP rendering.

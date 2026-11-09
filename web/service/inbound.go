@@ -380,7 +380,13 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 		}
 	}
 
-	return needRestart, db.Delete(model.Inbound{}, id).Error
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("inbound_id = ?", id).Delete(&model.ResellerAccess{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(model.Inbound{}, id).Error
+	})
+	return needRestart, err
 }
 
 func (s *InboundService) GetInbound(id int) (*model.Inbound, error) {

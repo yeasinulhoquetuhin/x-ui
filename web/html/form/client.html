@@ -170,6 +170,10 @@
       </a-textarea>
     </a-form>
   </a-form-item>
+  <a-form-item label="Show IP Limit on Subscription Page">
+    <a-switch v-model="client.showIpLimit"></a-switch>
+    <small style="display:block">Show connected / allowed IPs after Total Quota on this client's subscription page.</small>
+  </a-form-item>
   <a-form-item v-if="inbound.canEnableTlsFlow()" label="Flow">
     <a-select
       v-model="client.flow"

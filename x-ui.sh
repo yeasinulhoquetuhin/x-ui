@@ -127,7 +127,7 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/update.sh)
+    bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh)
     if [[ $? == 0 ]]; then
         LOGI "Update is complete, Panel has automatically restarted "
         before_show_menu
@@ -145,17 +145,21 @@ update_menu() {
         return 0
     fi
 
-    curl -fLRo /usr/bin/x-ui https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.sh
-    chmod +x ${xui_folder}/x-ui.sh
-    chmod +x /usr/bin/x-ui
-
-    if [[ $? == 0 ]]; then
-        echo -e "${green}Update successful. The panel has automatically restarted.${plain}"
-        exit 0
-    else
-        echo -e "${red}Failed to update the menu.${plain}"
+    local menu cli="${XUI_CLI_PATH:-/usr/bin/x-ui}"
+    menu=$(mktemp) || return 1
+    if ! curl -fLsS https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/x-ui.sh -o "$menu" || ! bash -n "$menu"; then
+        rm -f "$menu"
+        LOGE "Failed to download a valid menu."
         return 1
     fi
+    if ! command install -m 755 "$menu" "$cli" || ! command install -m 755 "$menu" "$xui_folder/x-ui.sh"; then
+        rm -f "$menu"
+        LOGE "Failed to update the menu."
+        return 1
+    fi
+    rm -f "$menu"
+    LOGI "Menu updated successfully."
+    exit 0
 }
 
 legacy_version() {
@@ -2202,6 +2206,27 @@ show_usage() {
 └────────────────────────────────────────────────────────────────┘"
 }
 
+payload_proxy_menu() {
+    local resources="$xui_folder/resources"
+    if [[ ! -f "$resources/payload-proxy.sh" || ! -f "$resources/setup-payload-proxy.py" ]]; then
+        LOGE "Payload / Proxy resources are missing. Update x-ui to install the bundled manager."
+        before_show_menu
+        return
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        LOGE "Python 3 is required for Payload / Proxy."
+        before_show_menu
+        return
+    fi
+    if ! python3 "$resources/setup-payload-proxy.py" "$resources/payload-proxy.sh"; then
+        LOGE "Unable to prepare Payload / Proxy. Existing proxy settings were preserved."
+        before_show_menu
+        return
+    fi
+    bash /usr/local/bin/x-ui-proxy
+    before_show_menu
+}
+
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
@@ -2211,7 +2236,7 @@ show_menu() {
 │   ${green}1.${plain} Install                                   │
 │   ${green}2.${plain} Update                                    │
 │   ${green}3.${plain} Update Menu                               │
-│   ${green}4.${plain} Legacy Version                            │
+│   ${green}4.${plain} Payload / Proxy                           │
 │   ${green}5.${plain} Uninstall                                 │
 │────────────────────────────────────────────────│
 │   ${green}6.${plain} Reset Username & Password                 │
@@ -2258,7 +2283,7 @@ show_menu() {
         check_install && update_menu
         ;;
     4)
-        check_install && legacy_version
+        check_install && payload_proxy_menu
         ;;
     5)
         check_install && uninstall

@@ -64,10 +64,8 @@ jobs:
           sudo ip addr add 192.0.2.2/32 dev lo
           sudo ip addr add 192.0.2.3/32 dev lo
           mkdir -p .cache
-          cp tests/testdata/tdzp-1.2.sh .cache/tdzp-test
-          python3 resources/tdzp-client-ip.py .cache/tdzp-test
           bash build_xray.sh .cache/xray-test
-          TDZ_TEST_XRAY="$PWD/.cache/xray-test" TDZ_TEST_PROXY="$PWD/.cache/tdzp-test" go test ./xray -run TestNativeIPLimitTransports -count=1
+          TDZ_TEST_XRAY="$PWD/.cache/xray-test" TDZ_TEST_PROXY="$PWD/resources/payload-proxy.sh" go test ./xray -run TestNativeIPLimitTransports -count=1
           (cd .cache/xray-core && go test -race ./app/dispatcher ./common/mux ./transport/internet ./transport/internet/grpc/encoding)
 
       - name: Test installer and client UI

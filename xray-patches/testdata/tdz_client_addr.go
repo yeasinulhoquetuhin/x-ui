@@ -33,10 +33,20 @@ func TDZLocalProxyIP(remote, local string) (string, bool) {
 	if _, err := strconv.ParseUint(backend, 10, 16); err != nil {
 		return "", false
 	}
-	directory := os.Getenv("TDZ_XRAY_PROXY_IP_DIR")
+	directory := os.Getenv("XUI_PROXY_IP_DIR")
 	if directory == "" {
-		directory = "/run/tdzp-client-ips"
+		directory = os.Getenv("TDZ_XRAY_PROXY_IP_DIR")
 	}
+	if directory == "" {
+		if ip, ok := tdzProxyIPRecord("/run/x-ui-proxy-ips", backend, port); ok {
+			return ip, true
+		}
+		directory = "/run/tdzp-client-ips" // Existing installations remain compatible.
+	}
+	return tdzProxyIPRecord(directory, backend, port)
+}
+
+func tdzProxyIPRecord(directory, backend, port string) (string, bool) {
 	if info, err := os.Lstat(directory); err != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
 		return "", false
 	}

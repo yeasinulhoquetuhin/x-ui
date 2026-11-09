@@ -84,13 +84,22 @@ func WriteClientIPLimits() error {
 func (s *InboundService) RefreshClientIPs() error {
 	clientIPSnapshotMu.Lock()
 	defer clientIPSnapshotMu.Unlock()
-	raw, err := os.ReadFile(xray.GetConfigPath())
+	snapshot, err := GetLiveClientIPSnapshot()
 	if err != nil {
 		return err
 	}
+	return StoreClientIPSnapshot(snapshot)
+}
+
+// GetLiveClientIPSnapshot never falls back to historical database IPs.
+func GetLiveClientIPSnapshot() (map[string][]xray.ClientIP, error) {
+	raw, err := os.ReadFile(xray.GetConfigPath())
+	if err != nil {
+		return nil, err
+	}
 	var cfg xray.Config
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return err
+		return nil, err
 	}
 	apiPort := 0
 	for _, inbound := range cfg.InboundConfigs {
@@ -101,14 +110,10 @@ func (s *InboundService) RefreshClientIPs() error {
 	}
 	var api xray.XrayAPI
 	if err := api.Init(apiPort); err != nil {
-		return err
+		return nil, err
 	}
 	defer api.Close()
-	snapshot, err := api.GetOnlineClientIPs()
-	if err != nil {
-		return err
-	}
-	return StoreClientIPSnapshot(snapshot)
+	return api.GetOnlineClientIPs()
 }
 
 func StoreClientIPSnapshot(snapshot map[string][]xray.ClientIP) error {

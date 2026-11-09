@@ -127,6 +127,9 @@
               <a-card hoverable>
                 <template #title>
                   <a-space direction="horizontal">
+                    {{if .is_reseller}}
+                    <a-tag color="green">Reseller Dashboard · {{.reseller_name}}</a-tag>
+                    {{else}}
                     <a-button type="primary" icon="plus"
                       @click="openAddInbound">
                       <template v-if="!isMobile">{{ i18n
@@ -167,6 +170,7 @@
                         </a-menu-item>
                       </a-menu>
                     </a-dropdown>
+                    {{end}}
                   </a-space>
                 </template>
                 <template #extra>
@@ -244,10 +248,18 @@
                         <a-menu slot="overlay"
                           @click="a => clickAction(a, dbInbound)"
                           :theme="themeSwitcher.currentTheme">
+                          {{if not .is_reseller}}
+                          <a-menu-item key="resellerAccess">
+                            <a-icon type="team"></a-icon>Reseller Access
+                          </a-menu-item>
+                          <a-menu-item key="copyResellerPath">
+                            <a-icon type="link"></a-icon>Copy Inbound Login URL
+                          </a-menu-item>
                           <a-menu-item key="edit">
                             <a-icon type="edit"></a-icon>
                             {{ i18n "edit" }}
                           </a-menu-item>
+                          {{end}}
                           <a-menu-item key="qrcode"
                             v-if="(dbInbound.isSS && !dbInbound.toInbound().isSSMultiUser) || dbInbound.isWireguard">
                             <a-icon type="qrcode"></a-icon>
@@ -262,10 +274,10 @@
                               <a-icon type="usergroup-add"></a-icon>
                               {{ i18n "pages.client.bulk"}}
                             </a-menu-item>
-                            <a-menu-item key="copyClients">
+                            {{if not .is_reseller}}<a-menu-item key="copyClients">
                               <a-icon type="copy"></a-icon>
                               {{ i18n "pages.client.copyFromInbound"}}
-                            </a-menu-item>
+                            </a-menu-item>{{end}}
                             <a-menu-item key="resetClients">
                               <a-icon type="file-done"></a-icon>
                               {{ i18n
@@ -292,7 +304,7 @@
                               {{ i18n "info"}}
                             </a-menu-item>
                           </template>
-                          <a-menu-item key="clipboard">
+                          {{if not .is_reseller}}<a-menu-item key="clipboard">
                             <a-icon type="copy"></a-icon>
                             {{ i18n "pages.inbounds.exportInbound" }}
                           </a-menu-item>
@@ -314,6 +326,7 @@
                               @change="switchEnable(dbInbound.id,dbInbound.enable)"></a-switch>
                             {{ i18n "pages.inbounds.enable" }}
                           </a-menu-item>
+                          {{end}}
                         </a-menu>
                       </a-dropdown>
                     </template>
@@ -481,7 +494,7 @@
                         ]]</a-tag>
                     </template>
                     <template slot="enable" slot-scope="text, dbInbound">
-                      <a-switch v-model="dbInbound.enable"
+                      <a-switch {{if .is_reseller}}disabled{{end}} v-model="dbInbound.enable"
                         @change="switchEnable(dbInbound.id,dbInbound.enable)"></a-switch>
                     </template>
                     <template slot="expiryTime" slot-scope="text, dbInbound">
@@ -781,6 +794,7 @@
 {{template "modals/inboundInfoModal"}}
 {{template "modals/clientsModal"}}
 {{template "modals/clientsBulkModal"}}
+{{if not .is_reseller}}{{template "modals/resellerAccess" .}}{{end}}
 <a-modal id="copy-clients-modal"
   :title="copyClientsModal.title"
   :visible="copyClientsModal.visible"
@@ -1191,7 +1205,7 @@
           to_inbound = dbInbound.toInbound()
           this.inbounds.push(to_inbound);
           this.dbInbounds.push(dbInbound);
-          if ([Protocols.VMESS, Protocols.VLESS, Protocols.TROJAN, Protocols.SHADOWSOCKS].includes(inbound.protocol)) {
+          if ([Protocols.VMESS, Protocols.VLESS, Protocols.TROJAN, Protocols.SHADOWSOCKS, Protocols.HYSTERIA].includes(inbound.protocol)) {
             if (dbInbound.isSS && (!to_inbound.isSSMultiUser)) {
               continue;
             }
@@ -1335,6 +1349,10 @@
       },
       clickAction(action, dbInbound) {
         switch (action.key) {
+          {{if not .is_reseller}}
+          case "resellerAccess": resellerAccessModal.show(dbInbound); break;
+          case "copyResellerPath": resellerAccessModal.copyPath(dbInbound); break;
+          {{end}}
           case "qrcode":
             this.showQrcode(dbInbound.id);
             break;

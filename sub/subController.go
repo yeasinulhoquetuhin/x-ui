@@ -132,6 +132,8 @@ func (a *SUBController) subs(c *gin.Context) {
 				basePathStr = strings.TrimRight(basePathStr, "/") + "/" + subId + "/"
 			}
 			page := a.subService.BuildPageData(subId, hostHeader, traffic, lastOnline, subs, subURL, subJsonURL, subClashURL, basePathStr)
+			ipLimit := a.subService.subscriptionIPLimit(subId)
+			c.Header("Cache-Control", "no-store")
 			c.HTML(200, "subpage.html", gin.H{
 				"title":        "subscription.title",
 				"cur_ver":      config.GetVersion(),
@@ -141,6 +143,9 @@ func (a *SUBController) subs(c *gin.Context) {
 				"download":     page.Download,
 				"upload":       page.Upload,
 				"total":        page.Total,
+				"showIpLimit":  ipLimit.Show,
+				"ipCount":      ipLimit.Count,
+				"ipLimit":      ipLimit.Limit,
 				"used":         page.Used,
 				"remained":     page.Remained,
 				"expire":       page.Expire,

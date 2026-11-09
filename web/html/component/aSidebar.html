@@ -44,6 +44,13 @@
         data() {
             return {
                 tabs: [
+                    {{if .is_reseller}}
+                    {
+                        key: '{{ .base_path }}panel/',
+                        icon: 'dashboard',
+                        title: 'Reseller Dashboard'
+                    },
+                    {{else}}
                     {
                         key: '{{ .base_path }}panel/',
                         icon: 'dashboard',
@@ -64,6 +71,7 @@
                         icon: 'tool',
                         title: '{{ i18n "menu.xray"}}'
                     },
+                    {{end}}
                     {
                         key: '{{ .base_path }}logout/',
                         icon: 'logout',

@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">TDZ X-UI</h1>
-<p align="center"><b>3X-UI v2.9.3-patched.3</b></p>
+<p align="center"><b>3X-UI v2.9.3-patched.4</b></p>
 
 <p align="center">
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/latest">
@@ -80,13 +80,28 @@ The default access-log path is `./access.log`. Native IP limiting and live repor
 
 IP limits reserve slots for real source addresses: the first admitted IP stays connected and new IPs are rejected while the limit is full. A shared public IP consumes one slot. Limited accounts reject unresolved loopback/private relay sources instead of silently putting every device into one proxy slot.
 
-TDZ Payload Proxy 1.2 is supported without changing its payload handshake or relayed bytes. The installer enables a root-private, live-socket-validated client-IP channel between TDZP and the bundled core. Existing proxy ports and client payloads stay usable. To enable it manually after installing the matching core:
+**X-UI Payload Proxy** is bundled under **x-ui → 4. Payload / Proxy**. Create, list, edit ports, start/stop, restart, view logs or delete individual proxies using the matching green CLI. The installer migrates existing legacy proxy instances while preserving their public/backend ports and payload handshake. Real source-IP admission uses the same private, live-socket-validated channel. No client payload change is needed.
 
 ```bash
-python3 /usr/local/x-ui/resources/tdzp-client-ip.py --restart
+x-ui
+# Choose 4. Payload / Proxy
 ```
 
-The TDZP channel works automatically with the bundled helper. For other reverse proxies/CDNs, HTTP transport IP headers are accepted only from explicitly trusted proxy addresses: set `TDZ_XRAY_TRUSTED_PROXIES` to a comma-separated list of exact proxy IPs/CIDRs in the panel service environment (include `127.0.0.1,::1` for a local HTTP reverse proxy). The proxy must overwrite or append the actual peer address. PROXY protocol remains available for correctly configured trusted listeners.
+The local payload-proxy channel works automatically. For other reverse proxies/CDNs, HTTP transport IP headers are accepted only from explicitly trusted proxy addresses: set `TDZ_XRAY_TRUSTED_PROXIES` to a comma-separated list of exact proxy IPs/CIDRs in the panel service environment (include `127.0.0.1,::1` for a local HTTP reverse proxy). The proxy must overwrite or append the actual peer address. PROXY protocol remains available for correctly configured trusted listeners.
+
+## ◈ Inbound Reseller Access
+
+Open an inbound's three-dot menu → **Reseller Access**. Enable access and set a unique **Path ID**, username and password, then save. **Copy Inbound Login URL** shares a URL such as `https://host:port/panelpath/shop-one/`.
+
+The reseller signs in with separate credentials and sees only the assigned inbound's clients, usage and online status. Client creation, editing, bulk creation, deletion, enable/disable, traffic resets, QR codes and subscription links are available. Inbound configuration, other inbounds, server controls, panel settings and backups remain admin-only. Admins retain full control of every client. No maximum-client cap is imposed.
+
+Changing the username, password or Path ID, disabling access, or deleting the inbound revokes the reseller's sessions, including an open live-update connection. The admin modal shows recent reseller client actions. Supported multi-client protocols are VLESS, VMess, Trojan, multi-user Shadowsocks and Hysteria.
+
+## ◈ Subscription IP Limit Display
+
+In the admin or reseller client editor, enable **Show IP Limit on Subscription Page** for an individual client. Its subscription web page then displays **IP Limit 0/2**, **1/2**, etc. immediately after Total Quota. The count is a current core snapshot, loaded when the page is opened or reloaded. Turning the switch off hides the row; existing clients default to off. The page displays `Unavailable` if a live snapshot cannot be read instead of reporting a false zero. Unlimited IP policies display `∞`.
+
+Menu **1. Install** and **2. Update** use this repository's `install.sh`; **3. Update Menu** downloads only `x-ui.sh`, validates it and replaces the CLI menu.
 
 ## ◈ Client Traffic Reset
 
@@ -96,7 +111,12 @@ For a six-month account with a 100 GB monthly allowance: set expiry six months a
 
 ---
 
-## ◈ Changelog (v2.9.3-patched.3)
+## ◈ Changelog (v2.9.3-patched.4)
+
+- **Reseller Access** — Per-inbound login, editable custom path, isolated client management and revocable live sessions
+- **Subscription IP Limit** — Per-client opt-in active/maximum IP display in admin and reseller editors
+- **Payload / Proxy** — Built-in X-UI proxy manager in menu 4, preserving existing proxy instances
+- **Manual IP Details** — Load once on opening; refresh using the existing button
 
 - **Client compatibility** — Empty and numeric-string Telegram IDs decode correctly alongside JSON numbers; no database reset required
 

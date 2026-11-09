@@ -26,7 +26,11 @@ Dataset provenance:
 
 Keep original license and attribution files when redistributing these resources.
 
-`tdzp-client-ip.py` upgrades the TDZ Payload Proxy 1.2 relay with a private
+`payload-proxy.sh` is the built-in **X-UI Payload Proxy** manager. The installer
+runs `setup-payload-proxy.py` to install `/usr/local/bin/x-ui-proxy` and safely
+migrate existing instances. Access it with **x-ui → 4. Payload / Proxy**.
+
+`tdzp-client-ip.py` remains a compatibility helper for the legacy 1.2 relay with a private
 per-socket real-IP channel for `TDZ-IPLimit/2`. It preserves payload handshakes
 and every relayed byte. The panel installer applies it to an installed TDZP
 script, saves a rollback copy, and restarts active proxy instances. Live records

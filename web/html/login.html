@@ -47,6 +47,7 @@
                 <a-button shape="circle" icon="setting"></a-button>
               </a-popover>
             </div>
+            {{if .is_reseller}}<p style="text-align:center;color:#008771;font-weight:600">Reseller Login</p>{{end}}
             <a-row type="flex" justify="center">
               <a-col :style="{ width: '100%' }">
                 <h2 class="title headline zoom">
@@ -68,7 +69,7 @@
                       </a-input>
                     </a-form-item>
                     <a-form-item>
-                      <a-input-password autocomplete="current-password" name="password" v-model.trim="user.password"
+                      <a-input-password autocomplete="current-password" name="password" v-model="user.password"
                         placeholder='{{ i18n "password" }}' required>
                         <a-icon slot="prefix" type="lock" class="fs-1rem"></a-icon>
                       </a-input-password>
