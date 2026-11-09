@@ -196,6 +196,8 @@
   <a-form-item label="Traffic Reset">
     <a-select v-model="client.trafficReset" :dropdown-class-name="themeSwitcher.currentTheme">
       <a-select-option value="never">Disabled</a-select-option>
+      <a-select-option value="hourly">Hourly</a-select-option>
+      <a-select-option value="12hourly">12 Hourly</a-select-option>
       <a-select-option value="daily">Daily</a-select-option>
       <a-select-option value="weekly">Weekly</a-select-option>
       <a-select-option value="monthly">Monthly</a-select-option>

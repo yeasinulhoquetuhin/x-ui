@@ -25,3 +25,12 @@ Dataset provenance:
 | geoip_RU.dat / geosite_RU.dat | runetfreedom/russia-v2ray-rules-dat |
 
 Keep original license and attribution files when redistributing these resources.
+
+`tdzp-client-ip.py` upgrades the TDZ Payload Proxy 1.2 relay with a private
+per-socket real-IP channel for `TDZ-IPLimit/2`. It preserves payload handshakes
+and every relayed byte. The panel installer applies it to an installed TDZP
+script, saves a rollback copy, and restarts active proxy instances. Live records
+are stored under `/run/tdzp-client-ips` (0700), checked against `/proc/PID/fd/FD`,
+and removed when the backend socket closes. No client configuration change is
+required. Use the same `TDZ_XRAY_PROXY_IP_DIR` for both processes when overriding
+the default path.

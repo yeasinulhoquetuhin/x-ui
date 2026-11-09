@@ -13,6 +13,7 @@ import (
 
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/features/stats"
+	"github.com/xtls/xray-core/transport/internet"
 )
 
 type tdzIPState struct {
@@ -67,6 +68,17 @@ func (l *tdzIPLimiter) reloadLocked(path string) ([]context.CancelFunc, error) {
 			delete(l.active, email)
 			continue
 		}
+		if limit > 0 {
+			for source, state := range ips {
+				ip, err := netip.ParseAddr(source)
+				if err != nil || !tdzPublicClientIP(ip) {
+					for _, stop := range state.streams {
+						stops = append(stops, stop)
+					}
+					delete(ips, source)
+				}
+			}
+		}
 		if limit <= 0 || len(ips) <= limit {
 			continue
 		}
@@ -87,6 +99,12 @@ func (l *tdzIPLimiter) reloadLocked(path string) ([]context.CancelFunc, error) {
 		}
 	}
 	return stops, nil
+}
+
+// A local/private relay address cannot identify the clients behind that relay.
+// Limited accounts must have a real source rather than sharing one proxy slot.
+func tdzPublicClientIP(ip netip.Addr) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate()
 }
 
 func (l *tdzIPLimiter) reload(path string) {
@@ -125,6 +143,13 @@ func (l *tdzIPLimiter) acquire(ctx context.Context, email, source, path string, 
 			}
 			return nil, nil, fmt.Errorf("client IP policy is not published for %q", email)
 		}
+	}
+	if l.limits[email] > 0 && !tdzPublicClientIP(ip) {
+		l.mu.Unlock()
+		for _, stop := range stops {
+			stop()
+		}
+		return nil, nil, fmt.Errorf("real client IP unavailable for limited client %q (observed %s); proxy must forward the client IP", email, canonical)
 	}
 	if l.active == nil {
 		l.active = make(map[string]map[string]*tdzIPState)
@@ -213,7 +238,13 @@ func (d *DefaultDispatcher) admitTDZClient(ctx context.Context) (context.Context
 	if d.policy.ForLevel(inbound.User.Level).Stats.UserOnline {
 		online, _ = stats.GetOrRegisterOnlineMap(d.stats, "user>>>"+inbound.User.Email+">>>online")
 	}
-	child, release, err := d.tdzIPs.acquire(ctx, inbound.User.Email, inbound.Source.Address.String(), os.Getenv("TDZ_XRAY_IP_LIMITS"), online)
+	source := inbound.Source.Address.String()
+	if inbound.Local.IsValid() {
+		if mapped, ok := internet.TDZLocalProxyIP(inbound.Source.NetAddr(), inbound.Local.NetAddr()); ok {
+			source = mapped
+		}
+	}
+	child, release, err := d.tdzIPs.acquire(ctx, inbound.User.Email, source, os.Getenv("TDZ_XRAY_IP_LIMITS"), online)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -127,21 +127,8 @@
         },
         methods: {
             async getDBClientIps(email) {
-                const msg = await HttpUtil.post(`/panel/api/inbounds/clientIps/${email}`);
-                if (!msg.success) {
-                    document.getElementById("clientIPs").value = msg.obj;
-                    return;
-                }
-                let ips = msg.obj;
-                if (typeof ips === 'string' && ips.startsWith('[') && ips.endsWith(']')) {
-                    try {
-                        ips = JSON.parse(ips);
-                        ips = Array.isArray(ips) ? ips.join("\n") : ips;
-                    } catch (e) {
-                        console.error('Error parsing JSON:', e);
-                    }
-                }
-                document.getElementById("clientIPs").value = Array.isArray(ips) ? ips.join("\n") : ips;
+                const result = await refreshIPs(email);
+                document.getElementById("clientIPs").value = result.array.length ? result.array.join("\n") : result.text;
             },
             async clearDBClientIps(email) {
                 try {
@@ -149,7 +136,7 @@
                     if (!msg.success) {
                         return;
                     }
-                    document.getElementById("clientIPs").value = "";
+                    await this.getDBClientIps(email);
                 } catch (error) {
                 }
             },

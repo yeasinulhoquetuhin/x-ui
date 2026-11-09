@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">TDZ X-UI</h1>
-<p align="center"><b>3X-UI v2.9.3-patched.2</b></p>
+<p align="center"><b>3X-UI v2.9.3-patched.3</b></p>
 
 <p align="center">
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/latest">
@@ -78,17 +78,25 @@ Install/update packages and core/GeoIP/GeoSite downloads use this repository's r
 
 The default access-log path is `./access.log`. Native IP limiting and live reporting also work when access logging is disabled. Install the matching TDZ core; a stock core does not contain the admission limiter.
 
-IP limits count source addresses visible to Xray. A shared public IP consumes one slot. Reverse proxies/CDNs must forward the real client address using a trusted configuration or PROXY protocol.
+IP limits reserve slots for real source addresses: the first admitted IP stays connected and new IPs are rejected while the limit is full. A shared public IP consumes one slot. Limited accounts reject unresolved loopback/private relay sources instead of silently putting every device into one proxy slot.
+
+TDZ Payload Proxy 1.2 is supported without changing its payload handshake or relayed bytes. The installer enables a root-private, live-socket-validated client-IP channel between TDZP and the bundled core. Existing proxy ports and client payloads stay usable. To enable it manually after installing the matching core:
+
+```bash
+python3 /usr/local/x-ui/resources/tdzp-client-ip.py --restart
+```
+
+The TDZP channel works automatically with the bundled helper. For other reverse proxies/CDNs, HTTP transport IP headers are accepted only from explicitly trusted proxy addresses: set `TDZ_XRAY_TRUSTED_PROXIES` to a comma-separated list of exact proxy IPs/CIDRs in the panel service environment (include `127.0.0.1,::1` for a local HTTP reverse proxy). The proxy must overwrite or append the actual peer address. PROXY protocol remains available for correctly configured trusted listeners.
 
 ## ◈ Client Traffic Reset
 
-Choose **Traffic Reset → Daily / Weekly / Monthly / Custom days** in the client editor. The schedule resets used traffic while preserving the total quota, expiry and all-time usage. Monthly cycles are anchored to activation time, and delayed-start clients begin their cycle on first use.
+Choose **Traffic Reset → Hourly / 12 Hourly / Daily / Weekly / Monthly / Custom days** in the client editor. The schedule resets used traffic while preserving the total quota, expiry and all-time usage. Hourly intervals are measured from activation, missed cycles catch up after downtime, and delayed-start clients begin their cycle on first use. Monthly cycles stay anchored to activation time.
 
 For a six-month account with a 100 GB monthly allowance: set expiry six months ahead, Total Traffic to 100 GB and Traffic Reset to Monthly. Leave account auto-renewal disabled if access must end after those six months.
 
 ---
 
-## ◈ Changelog (v2.9.3-patched.2)
+## ◈ Changelog (v2.9.3-patched.3)
 
 - **Client compatibility** — Empty and numeric-string Telegram IDs decode correctly alongside JSON numbers; no database reset required
 
@@ -101,7 +109,7 @@ For a six-month account with a 100 GB monthly allowance: set expiry six months a
 - **WebBasePath** — Unchanged during updates, preserving your custom path
 - **Sessions** — Credential changes log out existing panel sessions
 - **Multi-Arch** — amd64 and arm64 packages with bundled core source, patches and tests
-- **Traffic Reset** — Per-client daily, weekly, monthly or custom-day schedules
+- **Traffic Reset** — Per-client hourly, 12-hourly, daily, weekly, monthly or custom-day schedules
 - **Reinstall** — Existing settings preserved with migration rollback backup
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for verification coverage and usage details.

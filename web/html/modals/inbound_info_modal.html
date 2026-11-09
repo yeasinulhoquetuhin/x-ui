@@ -244,11 +244,12 @@
         <tr v-if="app.ipLimitEnable">
           <td>{{ i18n "pages.inbounds.IPLimit" }}</td>
           <td>
-            <a-tag v-if="infoModal.clientSettings.limitIp > 0"
+            <a-tag v-if="infoModal.ipTrackingError" color="orange">Live IP tracking unavailable</a-tag>
+            <a-tag v-else-if="infoModal.clientSettings.limitIp > 0"
               :color="getActiveIpCount() >= infoModal.clientSettings.limitIp ? 'red' : 'green'">
               [[ getActiveIpCount() ]] / [[ infoModal.clientSettings.limitIp ]]
             </a-tag>
-            <a-tag v-else>0</a-tag>
+            <a-tag v-else>[[ getActiveIpCount() ]] / ∞</a-tag>
           </td>
         </tr>
         <tr v-if="app.ipLimitEnable && infoModal.clientSettings">
@@ -541,7 +542,7 @@
   function refreshIPs(email) {
     return HttpUtil.post(`/panel/api/inbounds/clientIps/${email}`).then((msg) => {
       if (!msg.success) {
-        return { text: 'Live IP tracking unavailable', array: [] };
+        return { text: 'Live IP tracking unavailable', array: [], error: true };
       }
 
       const formatIpRecord = (record) => {
@@ -598,13 +599,13 @@
 
         // New format or object array
         if (Array.isArray(ips) && ips.length > 0 && typeof ips[0] === 'object') {
-          const result = ips.map((item) => formatIpRecord(item)).filter(Boolean);
+          const result = [...new Set(ips.map((item) => formatIpRecord(item)).filter(Boolean))];
           return { text: result.join(' | '), array: result };
         }
 
         // Old format - simple array of IPs
         if (Array.isArray(ips) && ips.length > 0) {
-          const result = ips.map((ip) => String(ip));
+          const result = [...new Set(ips.map((ip) => String(ip)).filter(Boolean))];
           return { text: result.join(', '), array: result };
         }
 
@@ -612,9 +613,9 @@
         return { text: String(ips), array: [String(ips)] };
 
       } catch (e) {
-        return { text: 'Error loading IPs', array: [] };
+        return { text: 'Error loading IPs', array: [], error: true };
       }
-    }).catch(() => ({ text: 'Live IP tracking unavailable', array: [] }));
+    }).catch(() => ({ text: 'Live IP tracking unavailable', array: [], error: true }));
   }
 
   const infoModal = {
@@ -633,9 +634,12 @@
     subJsonLink: '',
     clientIps: '',
     clientIpsArray: [],
+    ipTrackingError: false,
+    ipRefreshTimer: null,
     show(dbInbound, index) {
 	  this.clientIps = '';
 	  this.clientIpsArray = [];
+      this.ipTrackingError = false;
       this.index = index;
       this.inbound = dbInbound.toInbound();
       this.dbInbound = new DBInbound(dbInbound);
@@ -651,6 +655,7 @@
             if (!this.clientSettings || this.clientSettings.email !== email) return;
             this.clientIps = result.text;
             this.clientIpsArray = result.array;
+            this.ipTrackingError = !!result.error;
           }).finally(() => {
             this.loadingIps = false;
           })
@@ -673,6 +678,8 @@
     },
     close() {
       infoModal.visible = false;
+      clearInterval(this.ipRefreshTimer);
+      this.ipRefreshTimer = null;
     },
     genSubLink(subID) {
       return app.subSettings.subURI + subID;
@@ -726,6 +733,17 @@
         const expired = hasExpiry && now >= expiryTime;
 
         return expired || exhausted;
+      },
+    },
+    watch: {
+      'infoModal.visible'(visible) {
+        clearInterval(this.infoModal.ipRefreshTimer);
+        this.infoModal.ipRefreshTimer = null;
+        if (visible && app.ipLimitEnable && this.infoModal.clientSettings?.email) {
+          this.infoModal.ipRefreshTimer = setInterval(() => {
+            if (!this.refreshing) this.refreshIPs();
+          }, 2000);
+        }
       },
     },
     methods: {
@@ -786,9 +804,10 @@
         const email = this.infoModal.clientSettings.email;
         refreshIPs(email)
           .then((result) => {
-            if (!this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) return;
+            if (!this.infoModal.visible || !this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) return;
             this.infoModal.clientIps = result.text;
             this.infoModal.clientIpsArray = result.array;
+            this.infoModal.ipTrackingError = !!result.error;
           })
           .finally(() => {
             this.refreshing = false;
@@ -801,8 +820,7 @@
             if (!msg.success) {
               return;
             }
-            this.infoModal.clientIps = 'No IP Record';
-            this.infoModal.clientIpsArray = [];
+            this.refreshIPs();
           })
           .catch(() => { });
       },

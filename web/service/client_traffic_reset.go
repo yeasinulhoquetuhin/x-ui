@@ -13,14 +13,14 @@ import (
 
 func validateClientTrafficReset(period string, days int) error {
 	switch period {
-	case "", "never", "daily", "weekly", "monthly":
+	case "", "never", "hourly", "12hourly", "daily", "weekly", "monthly":
 		return nil
 	case "custom":
 		if days >= 1 && days <= 36500 {
 			return nil
 		}
 	}
-	return fmt.Errorf("invalid auto traffic reset; custom days must be 1-36500")
+	return fmt.Errorf("invalid traffic reset; custom days must be 1-36500")
 }
 
 // nextClientTrafficReset is anchored to activation time. Monthly cycles clamp
@@ -28,6 +28,17 @@ func validateClientTrafficReset(period string, days int) error {
 func nextClientTrafficReset(period string, days int, anchor, after time.Time) time.Time {
 	if period == "" || period == "never" {
 		return time.Time{}
+	}
+	if period == "hourly" || period == "12hourly" {
+		interval := time.Hour
+		if period == "12hourly" {
+			interval = 12 * time.Hour
+		}
+		cycles := after.Sub(anchor)/interval + 1
+		if cycles < 1 {
+			cycles = 1
+		}
+		return anchor.Add(cycles * interval)
 	}
 	if period == "monthly" {
 		months := (after.Year()-anchor.Year())*12 + int(after.Month()-anchor.Month())

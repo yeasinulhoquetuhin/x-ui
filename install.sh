@@ -916,6 +916,15 @@ install_x-ui() {
         return 1
     fi
 
+    # Preserve the payload proxy protocol while publishing its real socket peers.
+    if [[ -f /usr/local/bin/tdzp && -f "$xui_folder/resources/tdzp-client-ip.py" ]]; then
+        if command -v python3 >/dev/null; then
+            if ! python3 "$xui_folder/resources/tdzp-client-ip.py" --restart; then
+                echo "TDZP real-IP setup failed; the original proxy was preserved. See the error above."
+            fi
+        fi
+    fi
+
     # Etckeeper compatibility
     if [ -d "/etc/.git" ]; then
         if [ -f "/etc/.gitignore" ]; then

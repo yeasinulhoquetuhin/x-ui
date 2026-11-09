@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"runtime"
 	"sync"
 
@@ -235,7 +236,24 @@ func (s *XrayService) RestartXray(isForce bool) error {
 		return err
 	}
 	if !xray.NativeIPLimitAvailable() {
-		logger.Warning("[LimitIP] Installed core lacks TDZ native admission controls; install the matching TDZ panel release to enable IP limits.")
+		raw, err := os.ReadFile(xray.GetIPLimitConfigPath())
+		if err != nil {
+			return err
+		}
+		var limits map[string]int
+		if err := json.Unmarshal(raw, &limits); err != nil {
+			return err
+		}
+		for _, limit := range limits {
+			if limit > 0 {
+				if s.IsXrayRunning() {
+					_ = p.Stop()
+				}
+				result = "IP limits require the matching TDZ-IPLimit/2 core; refusing to run limited clients without admission controls"
+				return errors.New(result)
+			}
+		}
+		logger.Warning("[LimitIP] Installed core lacks TDZ-IPLimit/2 controls; install the matching TDZ panel release before adding limited clients.")
 	}
 
 	if s.IsXrayRunning() {

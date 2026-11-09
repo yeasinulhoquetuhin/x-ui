@@ -140,3 +140,29 @@ func TestTDZLimitMissingOrInvalidConfigDoesNotSilentlyDisable(t *testing.T) {
 		t.Fatal("invalid limits silently accepted")
 	}
 }
+
+func TestTDZLimitRejectsHiddenProxySources(t *testing.T) {
+	limiter := tdzIPLimiter{limits: map[string]int{"limited": 1}}
+	online := corestats.NewOnlineMap()
+	for _, ip := range []string{"127.0.0.1", "127.0.0.2", "::1", "::ffff:127.0.0.1", "10.0.0.1", "192.168.1.1", "fc00::1", "fe80::1"} {
+		if _, _, err := limiter.acquire(context.Background(), "limited", ip, "", online); err == nil {
+			t.Fatalf("hidden relay source was admitted: %s", ip)
+		}
+	}
+	if online.Count() != 0 {
+		t.Fatal("rejected proxy source counted as online")
+	}
+	_, release, err := limiter.acquire(context.Background(), "limited", "192.0.2.1", "", online)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if _, _, err := limiter.acquire(context.Background(), "limited", "192.0.2.2", "", online); err == nil {
+		t.Fatal("second real IP admitted")
+	}
+	_, unlimited, err := limiter.acquire(context.Background(), "unlimited", "127.0.0.1", "", nil)
+	if err != nil {
+		t.Fatal("unlimited account changed behavior", err)
+	}
+	unlimited()
+}

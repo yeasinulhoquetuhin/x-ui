@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -23,13 +25,15 @@ func TestNativeIPLimitTransports(t *testing.T) {
 	for _, tc := range []struct {
 		protocol, network string
 		mux               bool
+		proxy             bool
 	}{
-		{"vless", "tcp", false}, {"vless", "tcp", true}, {"vless", "ws", false},
-		{"vless", "grpc", false}, {"vless", "xhttp", false}, {"vless", "httpupgrade", false},
-		{"vless", "kcp", false}, {"vmess", "tcp", false}, {"vmess", "ws", true},
-		{"trojan", "tcp", false}, {"shadowsocks", "tcp", false},
+		{"vless", "tcp", false, false}, {"vless", "tcp", true, false}, {"vless", "ws", false, false},
+		{"vless", "grpc", false, false}, {"vless", "xhttp", false, false}, {"vless", "httpupgrade", false, false},
+		{"vless", "kcp", false, false}, {"vmess", "tcp", false, false}, {"vmess", "ws", true, false},
+		{"trojan", "tcp", false, false}, {"shadowsocks", "tcp", false, false},
+		{"vless", "ws", false, true}, {"vless", "ws", true, true}, {"vless", "tcp", false, true},
 	} {
-		t.Run(tc.protocol+"/"+tc.network+"/mux="+strconv.FormatBool(tc.mux), func(t *testing.T) {
+		t.Run(tc.protocol+"/"+tc.network+"/mux="+strconv.FormatBool(tc.mux)+"/proxy="+strconv.FormatBool(tc.proxy), func(t *testing.T) {
 			dir := t.TempDir()
 			port := func() int {
 				l, e := net.Listen("tcp", "127.0.0.1:0")
@@ -64,7 +68,7 @@ func TestNativeIPLimitTransports(t *testing.T) {
 					s["xhttpSettings"] = map[string]any{"path": "/test", "mode": "auto"}
 				}
 				if tc.network == "ws" {
-					s["wsSettings"] = map[string]any{"path": "/test"}
+					s["wsSettings"] = map[string]any{"path": "/test", "headers": map[string]string{"X-Forwarded-For": "198.51.100.99", "X-Real-IP": "198.51.100.99"}}
 				}
 				if tc.network == "httpupgrade" {
 					s["httpupgradeSettings"] = map[string]any{"path": "/test"}
@@ -100,8 +104,9 @@ func TestNativeIPLimitTransports(t *testing.T) {
 				cmd := exec.Command(binary, "run", "-config", path)
 				cmd.Dir = dir
 				cmd.Stdout, cmd.Stderr = log, log
+				cmd.Env = append(os.Environ(), "TDZ_XRAY_PROXY_IP_DIR="+filepath.Join(dir, "proxy-ips"))
 				if limitPath != "" {
-					cmd.Env = append(os.Environ(), "TDZ_XRAY_IP_LIMITS="+limitPath)
+					cmd.Env = append(cmd.Env, "TDZ_XRAY_IP_LIMITS="+limitPath)
 				}
 				if e := cmd.Start(); e != nil {
 					t.Fatal(e)
@@ -119,15 +124,19 @@ func TestNativeIPLimitTransports(t *testing.T) {
 			limits := filepath.Join(dir, "limits.json")
 			_ = os.WriteFile(limits, []byte(`{"limited":1}`), 0600)
 			start("server", server, limits)
+			endpointPort := serverPort
+			if tc.proxy {
+				endpointPort = startTDZPayloadTestProxy(t, dir, serverPort)
+			}
 			for i, socks := range []int{socks1, socks2} {
-				endpoint := map[string]any{"address": "127.0.0.1", "port": serverPort, "users": []any{user}}
+				endpoint := map[string]any{"address": "127.0.0.1", "port": endpointPort, "users": []any{user}}
 				settings := map[string]any{"vnext": []any{endpoint}}
 				if tc.protocol == "trojan" || tc.protocol == "shadowsocks" {
 					endpoint["password"] = "test-password"
 					endpoint["method"] = "chacha20-ietf-poly1305"
 					settings = map[string]any{"servers": []any{endpoint}}
 				}
-				client := map[string]any{"log": map[string]any{"loglevel": "debug", "access": "none"}, "inbounds": []any{map[string]any{"listen": "127.0.0.1", "port": socks, "protocol": "socks", "settings": map[string]any{"auth": "noauth"}}}, "outbounds": []any{map[string]any{"protocol": tc.protocol, "sendThrough": "127.0.0." + strconv.Itoa(i+2), "settings": settings, "streamSettings": stream(), "mux": map[string]any{"enabled": tc.mux, "concurrency": 8}}}}
+				client := map[string]any{"log": map[string]any{"loglevel": "debug", "access": "none"}, "inbounds": []any{map[string]any{"listen": "127.0.0.1", "port": socks, "protocol": "socks", "settings": map[string]any{"auth": "noauth"}}}, "outbounds": []any{map[string]any{"protocol": tc.protocol, "sendThrough": "192.0.2." + strconv.Itoa(i+2), "settings": settings, "streamSettings": stream(), "mux": map[string]any{"enabled": tc.mux, "concurrency": 8}}}}
 				start("client"+strconv.Itoa(i), client, "")
 			}
 			var api XrayAPI
@@ -191,8 +200,53 @@ func TestNativeIPLimitTransports(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if len(ips["limited"]) != 1 || ips["limited"][0].IP != "127.0.0.2" {
+			if len(ips["limited"]) != 1 || ips["limited"][0].IP != "192.0.2.2" {
 				t.Fatalf("wrong online IPs: %v", ips)
+			}
+			_ = first.SetDeadline(time.Now().Add(2 * time.Second))
+			if _, e := first.Write([]byte("live")); e != nil {
+				t.Fatal("first IP was interrupted", e)
+			}
+			var reply [4]byte
+			if _, e := io.ReadFull(first, reply[:]); e != nil || string(reply[:]) != "live" {
+				t.Fatalf("first IP stopped: %v", e)
+			}
+			_ = first.SetDeadline(time.Time{})
+			// A live policy edit and counters must both expose two distinct IPs.
+			if e := os.WriteFile(limits+".new", []byte(`{"limited":2}`), 0600); e != nil {
+				t.Fatal(e)
+			}
+			if e := os.Rename(limits+".new", limits); e != nil {
+				t.Fatal(e)
+			}
+			allowed := waitDial(socks2)
+			ips, e = api.GetOnlineClientIPs()
+			if e != nil || len(ips["limited"]) != 2 {
+				t.Fatalf("limit=2 must report 2/2: %v (%v)", ips, e)
+			}
+			if e := os.WriteFile(limits+".new", []byte(`{"limited":1}`), 0600); e != nil {
+				t.Fatal(e)
+			}
+			if e := os.Rename(limits+".new", limits); e != nil {
+				t.Fatal(e)
+			}
+			closeTimeout := 4 * time.Second
+			if tc.network == "kcp" {
+				closeTimeout = 12 * time.Second
+			}
+			_ = allowed.SetReadDeadline(time.Now().Add(closeTimeout))
+			if _, e := allowed.Read(reply[:]); e == nil {
+				t.Fatal("latest IP remained admitted after lowering limit")
+			} else if timeout, ok := e.(net.Error); ok && timeout.Timeout() {
+				t.Fatal("latest IP was not disconnected after lowering limit")
+			}
+			_ = allowed.Close()
+			_ = first.SetDeadline(time.Now().Add(2 * time.Second))
+			if _, e := first.Write([]byte("kept")); e != nil {
+				t.Fatal("lowering limit interrupted the first IP", e)
+			}
+			if _, e := io.ReadFull(first, reply[:]); e != nil || string(reply[:]) != "kept" {
+				t.Fatalf("first IP was not retained: %v", e)
 			}
 			_ = first.Close()
 			second := waitDial(socks2)
@@ -213,3 +267,86 @@ func TestNativeIPLimitTransports(t *testing.T) {
 }
 
 func binarypkgPutPort(buf []byte, port int) { binary.BigEndian.PutUint16(buf, uint16(port)) }
+
+func startTDZPayloadTestProxy(t *testing.T, dir string, backend int) int {
+	t.Helper()
+	proxy := os.Getenv("TDZ_TEST_PROXY")
+	if proxy == "" {
+		t.Skip("set TDZ_TEST_PROXY to the patched TDZP script for payload integration")
+	}
+	reserve, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	public := reserve.Addr().(*net.TCPAddr).Port
+	_ = reserve.Close()
+	base := filepath.Join(dir, "tdzp")
+	if err := os.MkdirAll(filepath.Join(base, "instances"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := "PUBLIC_PORT=" + strconv.Itoa(public) + "\nBACKEND_PORT=" + strconv.Itoa(backend) + "\n"
+	if err := os.WriteFile(filepath.Join(base, "instances/1.conf"), []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+	log, err := os.Create(filepath.Join(dir, "tdzp.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("bash", proxy, "--run-proxy", "1")
+	cmd.Env = append(os.Environ(), "TDZP_BASE_DIR="+base, "TDZ_XRAY_PROXY_IP_DIR="+filepath.Join(dir, "proxy-ips"))
+	cmd.Stdout, cmd.Stderr = log, log
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = log.Close()
+		if t.Failed() {
+			body, _ := os.ReadFile(filepath.Join(dir, "tdzp.log"))
+			t.Logf("proxy: %s", body)
+		}
+	})
+	gate, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = gate.Close() })
+	go func() {
+		for {
+			in, err := gate.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer in.Close()
+				dialer := net.Dialer{Timeout: time.Second, LocalAddr: &net.TCPAddr{IP: in.RemoteAddr().(*net.TCPAddr).IP}}
+				out, err := dialer.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(public)))
+				if err != nil {
+					return
+				}
+				defer out.Close()
+				_ = out.SetDeadline(time.Now().Add(3 * time.Second))
+				if _, err = io.WriteString(out, "GET /payload HTTP/1.1\r\nHost: payload\r\n\r\n"); err != nil {
+					return
+				}
+				reader := bufio.NewReader(out)
+				for {
+					line, e := reader.ReadString('\n')
+					if e != nil {
+						return
+					}
+					if strings.TrimSpace(line) == "" {
+						break
+					}
+				}
+				_ = out.SetDeadline(time.Time{})
+				done := make(chan struct{}, 2)
+				go func() { _, _ = io.Copy(out, in); done <- struct{}{} }()
+				go func() { _, _ = io.Copy(in, reader); done <- struct{}{} }()
+				<-done
+			}()
+		}
+	}()
+	return gate.Addr().(*net.TCPAddr).Port
+}

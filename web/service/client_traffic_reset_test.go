@@ -28,6 +28,10 @@ func TestClientTrafficResetSchedule(t *testing.T) {
 		days        int
 		after, want time.Time
 	}{
+		{"hourly", 0, anchor, anchor.Add(time.Hour)},
+		{"hourly", 0, anchor.Add(49*time.Hour + 30*time.Minute), anchor.Add(50 * time.Hour)},
+		{"12hourly", 0, anchor, anchor.Add(12 * time.Hour)},
+		{"12hourly", 0, anchor.Add(36 * time.Hour), anchor.Add(48 * time.Hour)},
 		{"daily", 0, anchor, anchor.AddDate(0, 0, 1)},
 		{"weekly", 0, anchor.AddDate(0, 0, 7), anchor.AddDate(0, 0, 14)},
 		{"custom", 15, anchor.AddDate(0, 0, 46), anchor.AddDate(0, 0, 60)},
@@ -157,5 +161,47 @@ func TestDelayedStartTrafficResetWaitsForActivation(t *testing.T) {
 	}
 	if traffic.NextTrafficReset <= time.Now().UnixMilli() {
 		t.Fatal("cycle did not start on activation")
+	}
+}
+
+func TestHourlyTrafficResetCatchesUpWithoutChangingAccount(t *testing.T) {
+	for _, period := range []string{"hourly", "12hourly"} {
+		t.Run(period, func(t *testing.T) {
+			setupClientResetDB(t)
+			start := time.Date(2026, 11, 9, 7, 15, 0, 0, time.UTC)
+			interval := time.Hour
+			if period == "12hourly" {
+				interval = 12 * time.Hour
+			}
+			client := model.Client{Email: "hourly-account", Enable: true, TotalGB: 1000, ExpiryTime: start.AddDate(0, 6, 0).UnixMilli(), TrafficReset: period}
+			data, _ := json.Marshal(map[string]any{"clients": []model.Client{client}, "decryption": "none"})
+			inbound := model.Inbound{Tag: "hourly", Enable: true, Protocol: model.VLESS, Settings: string(data)}
+			if err := database.GetDB().Create(&inbound).Error; err != nil {
+				t.Fatal(err)
+			}
+			traffic := xray.ClientTraffic{InboundId: inbound.Id, Email: client.Email, Enable: false, Up: 1000, Down: 200, Total: 1000, AllTime: 5000, ExpiryTime: client.ExpiryTime}
+			if err := configureClientTrafficReset(&traffic, &client, start); err != nil {
+				t.Fatal(err)
+			}
+			if traffic.NextTrafficReset != start.Add(interval).UnixMilli() {
+				t.Fatal("wrong initial deadline")
+			}
+			if err := database.GetDB().Create(&traffic).Error; err != nil {
+				t.Fatal(err)
+			}
+			var service InboundService
+			now := start.Add(3*interval + 30*time.Minute)
+			if restart, err := service.ResetDueClientTraffics(now); err != nil || !restart {
+				t.Fatalf("quota account not restored: %v", err)
+			}
+			var updated xray.ClientTraffic
+			database.GetDB().First(&updated, traffic.Id)
+			if updated.Up != 0 || updated.Down != 0 || !updated.Enable || updated.NextTrafficReset != start.Add(4*interval).UnixMilli() {
+				t.Fatalf("wrong catch-up: %+v", updated)
+			}
+			if updated.Total != 1000 || updated.AllTime != 5000 || updated.ExpiryTime != client.ExpiryTime {
+				t.Fatal("account allowance/lifetime modified")
+			}
+		})
 	}
 }

@@ -36,4 +36,8 @@ test('IP display handles empty and failed snapshots without counting placeholder
   assert.equal((await ctx.refreshIPs('client')).array.length, 0);
   ctx.HttpUtil.post = async () => ({success:true, obj:['192.0.2.1 (2026-01-01)']});
   assert.equal((await ctx.refreshIPs('client')).array.length, 1);
+  ctx.HttpUtil.post = async () => ({success:true, obj:['192.0.2.1', '192.0.2.1', '192.0.2.2']});
+  assert.equal((await ctx.refreshIPs('client')).array.length, 2);
+  ctx.HttpUtil.post = async () => { throw new Error('API disconnected'); };
+  assert.equal((await ctx.refreshIPs('client')).error, true);
 });

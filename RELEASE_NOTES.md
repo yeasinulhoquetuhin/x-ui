@@ -1,4 +1,10 @@
-# TDZ X-UI v2.9.3-patched.2
+# TDZ X-UI v2.9.3-patched.3
+
+- Fix TDZ payload-proxy client IPs using a private, live-socket-validated IP channel. Payload handshake, relay bytes and proxy ports are preserved.
+- Limited accounts reject unresolved local/private proxy sources instead of treating all proxied devices as one IP. New IPs are rejected while slots are full; the first admitted IP remains connected.
+- HTTP forwarded-IP headers are trusted only from explicitly configured proxy peers; direct connections and unconfigured payload relays cannot choose their counted IP through client-supplied headers.
+- Client info refreshes live IPs/counts every two seconds while open. Failed tracking is shown as unavailable, and clearing the display cannot conceal an active IP.
+- Add **Hourly** and **12 Hourly** Traffic Reset schedules, anchored to activation and catching up after downtime.
 
 - Hotfix: client Telegram IDs accept empty strings, numeric strings, JSON numbers, null and omitted fields. Existing client records and client forms work without a database reset.
 
@@ -8,7 +14,7 @@
 - Default access log is `./access.log`; existing `/var/log/xray/access.log` defaults migrate automatically.
 - Changing panel credentials invalidates existing HTTP sessions and closes authenticated WebSocket connections.
 - Re-running the installer updates the application while preserving the database, SSL, credentials, panel path, port, service file and local certificates. Failed migrations restore the previous application and database backup.
-- Per-client Traffic Reset: daily, weekly, monthly or a custom number of days. Only current-cycle usage resets; account expiry, quota and all-time usage are preserved.
+- Per-client Traffic Reset: hourly, 12-hourly, daily, weekly, monthly or a custom number of days. Only current-cycle usage resets; account expiry, quota and all-time usage are preserved.
 - Install/update scripts, core updates and bundled GeoIP/GeoSite downloads use this repository's releases.
 
 ## Six-month account with a monthly allowance
@@ -31,4 +37,4 @@ Both `x-ui-linux-amd64.tar.gz` and `x-ui-linux-arm64.tar.gz` contain the matchin
 - Core atomic-admission, canonical IPv4/IPv6, reference-count release, live limit edits and missing/malformed policy tests.
 - Real two-source-IP echo connections: VLESS TCP, TCP+MUX, WebSocket, gRPC, XHTTP, HTTPUpgrade and mKCP; VMess TCP and WebSocket+MUX; Trojan TCP; Shadowsocks TCP.
 
-IP limits count source addresses visible to the core, not physical devices. Reverse proxies/CDNs must forward the actual client address through a correctly configured trusted transport or PROXY protocol. A shared public IP occupies one slot.
+IP limits count real source addresses, not physical devices. The bundled TDZP helper publishes the socket peer without changing payload protocols. Other reverse proxies/CDNs must forward the actual client address through trusted headers or PROXY protocol. A shared public IP occupies one slot.
