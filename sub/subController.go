@@ -146,6 +146,7 @@ func (a *SUBController) subs(c *gin.Context) {
 				"showIpLimit":  ipLimit.Show,
 				"ipCount":      ipLimit.Count,
 				"ipLimit":      ipLimit.Limit,
+				"ipLimitColor": ipLimit.Color,
 				"used":         page.Used,
 				"remained":     page.Remained,
 				"expire":       page.Expire,

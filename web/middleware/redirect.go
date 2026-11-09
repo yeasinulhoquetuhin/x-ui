@@ -23,7 +23,7 @@ func RedirectMiddleware(basePath string) gin.HandlerFunc {
 		for from, to := range redirects {
 			from, to = basePath+from, basePath+to
 
-			if strings.HasPrefix(path, from) {
+			if path == from || strings.HasPrefix(path, from+"/") {
 				newPath := to + path[len(from):]
 
 				c.Redirect(http.StatusMovedPermanently, newPath)

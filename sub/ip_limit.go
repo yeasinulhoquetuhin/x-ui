@@ -12,6 +12,7 @@ type subscriptionIPLimit struct {
 	Show  bool
 	Count string
 	Limit string
+	Color string
 }
 
 func subscriptionIPClients(inbounds []*model.Inbound, subID string) map[string]int {
@@ -63,7 +64,13 @@ func summarizeSubscriptionIPs(clients map[string]int, snapshot map[string][]xray
 	if !live {
 		active = "Unavailable"
 	}
-	return subscriptionIPLimit{Show: true, Count: active, Limit: maximum}
+	color := "green"
+	if !live {
+		color = "orange"
+	} else if !unlimited && total > 0 && count >= total {
+		color = "red"
+	}
+	return subscriptionIPLimit{Show: true, Count: active, Limit: maximum, Color: color}
 }
 
 func (s *SubService) subscriptionIPLimit(subID string) subscriptionIPLimit {

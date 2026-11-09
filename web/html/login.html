@@ -63,7 +63,7 @@
                 <a-form @submit.prevent="login">
                   <a-space direction="vertical" size="middle">
                     <a-form-item>
-                      <a-input autocomplete="username" name="username" v-model.trim="user.username"
+                      <a-input autocomplete="username" name="username" v-model="user.username"
                         placeholder='{{ i18n "username" }}' autofocus required>
                         <a-icon slot="prefix" type="user" class="fs-1rem"></a-icon>
                       </a-input>

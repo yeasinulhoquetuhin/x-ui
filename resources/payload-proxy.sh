@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 BASE_DIR="${XUI_PROXY_BASE_DIR:-${TDZP_BASE_DIR:-/etc/x-ui/payload-proxy}}"
 INSTANCES_DIR="$BASE_DIR/instances"
 FIREWALL_DIR="$BASE_DIR/firewall"
@@ -14,13 +14,13 @@ LEGACY_FIREWALL="${TDZP_LEGACY_FIREWALL:-/etc/tdzp.firewall}"
 LEGACY_SERVICE="${TDZP_LEGACY_SERVICE:-/etc/systemd/system/tdzp.service}"
 
 if [[ -t 1 ]]; then
-    RESET=$'\033[0m'; BOLD=$'\033[1m'; RED=$'\033[38;5;196m'; GREEN=$'\033[38;5;46m'
-    YELLOW=$'\033[38;5;226m'; CYAN=$'\033[0;32m'; GRAY=$'\033[38;5;245m'; WHITE=$'\033[38;5;255m'
+    RESET=$'\033[0m'; BOLD=$'\033[1m'; RED=$'\033[0;31m'; GREEN=$'\033[0;32m'
+    YELLOW=$'\033[0;33m'; CYAN=$'\033[0;32m'; GRAY=$'\033[0m'; WHITE=$'\033[0m'
 else
     RESET=''; BOLD=''; RED=''; GREEN=''; YELLOW=''; CYAN=''; GRAY=''; WHITE=''
 fi
 
-BOX_WIDTH=58
+BOX_WIDTH=48
 repeat_char() { local char=$1 count=$2 out; printf -v out '%*s' "$count" ''; printf '%s' "${out// /$char}"; }
 center_line() {
     local text=$1 color=${2:-$WHITE} len left right
@@ -28,17 +28,24 @@ center_line() {
     (( len > BOX_WIDTH )) && text=${text:0:BOX_WIDTH} && len=${#text}
     left=$(( (BOX_WIDTH - len) / 2 ))
     right=$(( BOX_WIDTH - len - left ))
-    printf '  %b║%*s%b%s%b%*s%b║%b\n' "$CYAN" "$left" '' "$color" "$text" "$RESET" "$right" '' "$CYAN" "$RESET"
+    printf '│%*s%b%s%b%*s│\n' "$left" '' "$color" "$text" "$RESET" "$right" ''
 }
 banner() {
     [[ -t 1 ]] && clear || true
     echo
-    printf '  %b╔%s╗%b\n' "$CYAN" "$(repeat_char '═' "$BOX_WIDTH")" "$RESET"
-    center_line 'X-UI PAYLOAD / PROXY' "${BOLD}${CYAN}"
-    center_line 'Create • Manage • Real Client IP' "$GREEN"
-    printf '  %b╚%s╝%b\n' "$CYAN" "$(repeat_char '═' "$BOX_WIDTH")" "$RESET"
+    printf '╔%s╗\n' "$(repeat_char '─' "$BOX_WIDTH")"
+    center_line 'X-UI Payload / Proxy Management' "$GREEN"
+    center_line "Version $VERSION" "$GREEN"
+    menu_bottom
 }
-line() { printf '  %b%s%b\n' "$CYAN" "$(repeat_char '─' "$BOX_WIDTH")" "$RESET"; }
+line() { printf '│%s│\n' "$(repeat_char '─' "$BOX_WIDTH")"; }
+menu_row() {
+    local key=$1 text=$2 gap
+    gap=$((BOX_WIDTH-5-${#key}-${#text}))
+    ((gap<0)) && gap=0
+    printf '│   %b%s.%b %s%*s│\n' "$GREEN" "$key" "$RESET" "$text" "$gap" ''
+}
+menu_bottom() { printf '╚%s╝\n' "$(repeat_char '─' "$BOX_WIDTH")"; }
 msg() {
     local kind=${1^^} text=$2 color mark
     case "$kind" in
@@ -540,14 +547,16 @@ manage_instance() {
     local id=$1 choice
     while instance_exists "$id"; do
         banner; echo; show_proxy_card "$id"; echo
-        printf '  %b[1]%b Edit Public Port\n' "$CYAN" "$RESET"
-        printf '  %b[2]%b Edit Backend Port\n' "$CYAN" "$RESET"
-        printf '  %b[3]%b Restart Proxy\n' "$CYAN" "$RESET"
-        printf '  %b[4]%b Delete Proxy\n' "$RED" "$RESET"
-        printf '  %b[5]%b Start Proxy\n' "$GREEN" "$RESET"
-        printf '  %b[6]%b Stop Proxy\n' "$YELLOW" "$RESET"
-        printf '  %b[7]%b View Logs\n' "$GREEN" "$RESET"
-        printf '  %b[0]%b Back\n' "$GRAY" "$RESET"
+        printf '╔%s╗\n' "$(repeat_char '─' "$BOX_WIDTH")"
+        menu_row 1 'Edit Public Port'
+        menu_row 2 'Edit Backend Port'
+        menu_row 3 'Restart Proxy'
+        menu_row 4 'Delete This Proxy'
+        menu_row 5 'Start Proxy'
+        menu_row 6 'Stop Proxy'
+        menu_row 7 'View Logs'
+        menu_row 0 'Back'
+        menu_bottom
         echo
         read -r -p '  Select option: ' choice
         case "$choice" in
@@ -587,57 +596,6 @@ proxy_list_screen() {
         fi
     done
 }
-spinner_run() {
-    local label=$1; shift
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏') i=0 pid status
-    "$@" >/dev/null 2>&1 & pid=$!
-    if [[ -t 1 ]]; then
-        while kill -0 "$pid" 2>/dev/null; do
-            printf '\r  %b%s%b %-36s' "$CYAN" "${frames[$i]}" "$RESET" "$label"
-            i=$(( (i + 1) % ${#frames[@]} ))
-            sleep 0.08
-        done
-    fi
-    if wait "$pid"; then status=0; else status=$?; fi
-    if [[ -t 1 ]]; then
-        printf '\r  %b✓%b %-36s %bDONE%b\n' "$GREEN" "$RESET" "$label" "$GREEN" "$RESET"
-    fi
-    return "$status"
-}
-uninstall_stop_all() {
-    local id
-    while IFS= read -r id; do
-        [[ -n "$id" ]] || continue
-        systemctl disable --now "$(service_name "$id")" >/dev/null 2>&1 || true
-    done < <(instance_ids)
-}
-uninstall_firewalls() {
-    local id
-    while IFS= read -r id; do [[ -n "$id" ]] && firewall_remove "$id"; done < <(instance_ids)
-}
-uninstall_settings() {
-    rm -rf "$BASE_DIR"
-    rm -f "$SERVICE_FILE" "$SYSCTL_FILE"
-    sysctl --system >/dev/null 2>&1 || true
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl reset-failed >/dev/null 2>&1 || true
-}
-uninstall_command() { rm -f "$SELF_BIN"; }
-uninstall_proxy() {
-    local answer
-    banner; echo
-    msg warn 'This will remove every X-UI Payload Proxy.'
-    read -r -p '  Type YES to continue: ' answer
-    [[ "$answer" == YES ]] || { msg info 'Uninstall cancelled.'; pause_screen; return; }
-    echo
-    spinner_run 'Stopping all proxy services' uninstall_stop_all
-    spinner_run 'Removing firewall rules' uninstall_firewalls
-    spinner_run 'Removing proxy settings' uninstall_settings
-    spinner_run 'Removing proxy command' uninstall_command
-    echo
-    msg ok 'X-UI Payload Proxy has been uninstalled.'
-    exit 0
-}
 menu() {
     require_root
     ensure_layout
@@ -646,20 +604,18 @@ menu() {
         total=$(instance_count)
         active=$(active_count)
         banner
-        echo
-        printf '  Proxies: %b%s%b   Active: %b%s%b\n' "$CYAN" "$total" "$RESET" "$GREEN" "$active" "$RESET"
+        printf '╔%s╗\n' "$(repeat_char '─' "$BOX_WIDTH")"
+        center_line "Proxies: $total     Active: $active" "$GREEN"
         line
-        printf '  %b[1]%b Create New Proxy\n' "$CYAN" "$RESET"
-        printf '  %b[2]%b Proxy List\n' "$CYAN" "$RESET"
-        printf '  %b[0]%b Exit\n' "$GRAY" "$RESET"
-        line
-        printf '  %b[99]%b Uninstall\n' "$RED" "$RESET"
+        menu_row 1 'Create Proxy'
+        menu_row 2 'Manage Proxies'
+        menu_row 0 'Back to X-UI'
+        menu_bottom
         echo
         read -r -p '  Select option: ' choice
         case "$choice" in
             1) create_proxy_screen ;;
             2) proxy_list_screen ;;
-            99) uninstall_proxy ;;
             0) exit 0 ;;
             *) msg error 'Invalid option.'; sleep 1 ;;
         esac

@@ -20,7 +20,7 @@ def read_settings(path):
     return public, backend
 
 
-def install(source, root=Path('/'), run=subprocess.run):
+def install(source, root=Path('/'), run=subprocess.run, migrate=False):
     base = root / 'etc/x-ui/payload-proxy'
     binary = root / 'usr/local/bin/x-ui-proxy'
     units = root / 'etc/systemd/system'
@@ -30,11 +30,11 @@ def install(source, root=Path('/'), run=subprocess.run):
     subprocess.run(['bash', '-n', str(source)], check=True)
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
     legacy = []
-    if old.is_dir():
+    if migrate and old.is_dir():
         for file in sorted((old / 'instances').glob('*.conf')):
             if file.stem.isdigit():
                 legacy.append((file.stem, file, f'tdzp@{file.stem}.service'))
-    if not legacy and single.is_file():
+    if migrate and not legacy and single.is_file():
         legacy.append(('1', single, 'tdzp.service'))
     # Validate and plan every port before touching services.
     planned = []
@@ -127,5 +127,6 @@ WantedBy=multi-user.target
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('source', nargs='?', default=str(Path(__file__).with_name('payload-proxy.sh')))
+    parser.add_argument('--migrate-existing',action='store_true',help='Import existing legacy proxy instances explicitly')
     args = parser.parse_args()
-    install(args.source)
+    install(args.source,migrate=args.migrate_existing)

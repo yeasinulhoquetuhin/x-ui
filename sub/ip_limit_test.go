@@ -17,7 +17,7 @@ func TestSubscriptionIPLimitIsOptInAndCountsCanonicalIPs(t *testing.T) {
 	clients := subscriptionIPClients([]*model.Inbound{{Settings: string(data)}}, "own")
 	snapshot := map[string][]xray.ClientIP{"shown": {{IP: "192.0.2.1"}, {IP: "::ffff:192.0.2.1"}}, "hidden": {{IP: "192.0.2.2"}}, "other": {{IP: "192.0.2.3"}}}
 	got := summarizeSubscriptionIPs(clients, snapshot, true)
-	if !got.Show || got.Count != "1" || got.Limit != "2" {
+	if !got.Show || got.Count != "1" || got.Limit != "2" || got.Color != "green" {
 		t.Fatalf("wrong display: %+v", got)
 	}
 	if got := summarizeSubscriptionIPs(clients, map[string][]xray.ClientIP{}, true); got.Count != "0" {
@@ -28,5 +28,9 @@ func TestSubscriptionIPLimitIsOptInAndCountsCanonicalIPs(t *testing.T) {
 	}
 	if got := summarizeSubscriptionIPs(nil, snapshot, true); got.Show {
 		t.Fatal("hidden client revealed IP limit")
+	}
+	full := summarizeSubscriptionIPs(map[string]int{"shown": 1}, snapshot, true)
+	if full.Color != "red" || full.Count != "1" || full.Limit != "1" {
+		t.Fatalf("full slots must be red: %+v", full)
 	}
 }

@@ -30,7 +30,7 @@ func TestResellerSettingsValidationAndSecretRedaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !crypto.CheckPasswordHash(account.PasswordHash, form.Password) {
+	if !CheckResellerPassword(account.PasswordHash, form.Password) {
 		t.Fatal("password not hashed")
 	}
 	encoded, _ := json.Marshal(account)
@@ -54,7 +54,7 @@ func TestResellerSettingsValidationAndSecretRedaction(t *testing.T) {
 	if _, err = service.Save(other.Id, form); err == nil {
 		t.Fatal("duplicate path accepted")
 	}
-	for _, path := range []string{"panel", "assets", "a/b", "..", "a b", "login", "Ab"} {
+	for _, path := range []string{"panel", "assets", "a/b", "..", "a b", "login"} {
 		if ValidResellerPath(path) {
 			t.Fatalf("invalid path accepted %q", path)
 		}
@@ -71,6 +71,32 @@ func TestResellerSettingsValidationAndSecretRedaction(t *testing.T) {
 	}
 	if !strings.Contains(combined, "public") {
 		t.Fatal("client connection public key removed")
+	}
+}
+
+func TestResellerCredentialsHaveNoArbitraryLengthRestrictions(t *testing.T) {
+	setupClientResetDB(t)
+	inbound := resellerTestInbound(t, "lengths", nil)
+	var service ResellerService
+	for _, form := range []ResellerAccessForm{
+		{Enabled: true, Path: "a", Username: "u", Password: "p"},
+		{Enabled: true, Path: strings.Repeat("long-", 30), Username: strings.Repeat("user", 40), Password: strings.Repeat("password", 30)},
+		{Enabled: true, Path: "xui-shop", Username: "name with spaces", Password: " x "},
+	} {
+		account, err := service.Save(inbound.Id, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !CheckResellerPassword(account.PasswordHash, form.Password) || CheckResellerPassword(account.PasswordHash, form.Password+"different") {
+			t.Fatal("password comparison truncated or changed")
+		}
+	}
+	legacy, err := crypto.HashPasswordAsBcrypt("old-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !CheckResellerPassword(legacy, "old-password") {
+		t.Fatal("existing reseller hash stopped working")
 	}
 }
 

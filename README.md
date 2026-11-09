@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">TDZ X-UI</h1>
-<p align="center"><b>3X-UI v2.9.3-patched.4</b></p>
+<p align="center"><b>3X-UI v2.9.3-patched.5</b></p>
 
 <p align="center">
   <a href="https://github.com/yeasinulhoquetuhin/x-ui/releases/latest">
@@ -31,6 +31,16 @@ bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master
 ```
 
 The installer auto-detects your architecture. Re-running it updates the application while preserving existing SSL, credentials, panel path, port, database and local certificates. Native IP limits use the patched core included in the release.
+
+No version argument installs the latest published package. Select an older patched version with a shortcut:
+
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v1
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v2
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v3
+```
+
+`v1` maps to `v2.9.3-patched.1`, and so on. Full release tags also work. If the requested version has no package for this architecture, the installer lists available releases and lets you accept the latest with `y`, select another version, or cancel before changing the installation.
 
 ---
 
@@ -80,7 +90,7 @@ The default access-log path is `./access.log`. Native IP limiting and live repor
 
 IP limits reserve slots for real source addresses: the first admitted IP stays connected and new IPs are rejected while the limit is full. A shared public IP consumes one slot. Limited accounts reject unresolved loopback/private relay sources instead of silently putting every device into one proxy slot.
 
-**X-UI Payload Proxy** is bundled under **x-ui → 4. Payload / Proxy**. Create, list, edit ports, start/stop, restart, view logs or delete individual proxies using the matching green CLI. The installer migrates existing legacy proxy instances while preserving their public/backend ports and payload handshake. Real source-IP admission uses the same private, live-socket-validated channel. No client payload change is needed.
+**X-UI Payload Proxy** is bundled under **x-ui → 4. Payload / Proxy**. Create, list, edit ports, start/stop, restart, view logs or delete individual proxies using the matching green CLI. Panel installation installs the manager only; it never creates or imports proxy instances automatically. Existing managed proxies are preserved. Whole-manager uninstall has been removed from the proxy menu. Real source-IP admission uses the same private, live-socket-validated channel. No client payload change is needed.
 
 ```bash
 x-ui
@@ -93,13 +103,15 @@ The local payload-proxy channel works automatically. For other reverse proxies/C
 
 Open an inbound's three-dot menu → **Reseller Access**. Enable access and set a unique **Path ID**, username and password, then save. **Copy Inbound Login URL** shares a URL such as `https://host:port/panelpath/shop-one/`.
 
+Path IDs, usernames and passwords have no arbitrary minimum length or form length cap: one-character values work. A path must still be a non-empty URL segment and cannot conflict with a reserved panel route. Existing password hashes remain supported. Save, Copy URL and Activity buttons retain the inbound context when clicked.
+
 The reseller signs in with separate credentials and sees only the assigned inbound's clients, usage and online status. Client creation, editing, bulk creation, deletion, enable/disable, traffic resets, QR codes and subscription links are available. Inbound configuration, other inbounds, server controls, panel settings and backups remain admin-only. Admins retain full control of every client. No maximum-client cap is imposed.
 
 Changing the username, password or Path ID, disabling access, or deleting the inbound revokes the reseller's sessions, including an open live-update connection. The admin modal shows recent reseller client actions. Supported multi-client protocols are VLESS, VMess, Trojan, multi-user Shadowsocks and Hysteria.
 
 ## ◈ Subscription IP Limit Display
 
-In the admin or reseller client editor, enable **Show IP Limit on Subscription Page** for an individual client. Its subscription web page then displays **IP Limit 0/2**, **1/2**, etc. immediately after Total Quota. The count is a current core snapshot, loaded when the page is opened or reloaded. Turning the switch off hides the row; existing clients default to off. The page displays `Unavailable` if a live snapshot cannot be read instead of reporting a false zero. Unlimited IP policies display `∞`.
+In the admin or reseller client editor, enable **Show IP Limit on Subscription Page** for an individual client. Its subscription web page then displays **IP Limit 0/2**, **1/2**, etc. immediately after Total Quota. The count uses the same bordered tag style as client details: green below the limit, red when full (for example `1/1`), orange when unavailable. The count is a current core snapshot, loaded when the page is opened or reloaded. Turning the switch off hides the row; existing clients default to off. Unlimited IP policies display `∞`.
 
 Menu **1. Install** and **2. Update** use this repository's `install.sh`; **3. Update Menu** downloads only `x-ui.sh`, validates it and replaces the CLI menu.
 
@@ -111,7 +123,13 @@ For a six-month account with a 100 GB monthly allowance: set expiry six months a
 
 ---
 
-## ◈ Changelog (v2.9.3-patched.4)
+## ◈ Changelog (v2.9.3-patched.5)
+
+- **Reseller buttons** — Fix undefined inbound IDs on actual Save/Copy/Activity button clicks
+- **Flexible credentials** — One-character paths/usernames/passwords and long passwords supported
+- **Version selection** — Latest by default, `v1`/`v2`/`v3` shortcuts and missing-version selection prompt
+- **Proxy manager** — Updated green CLI, no manager-uninstall option, no automatic proxy creation/import
+- **IP tags** — Bordered green/red subscription IP-limit indicators
 
 - **Reseller Access** — Per-inbound login, editable custom path, isolated client management and revocable live sessions
 - **Subscription IP Limit** — Per-client opt-in active/maximum IP display in admin and reseller editors

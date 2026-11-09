@@ -1,29 +1,29 @@
 {{define "modals/resellerAccess"}}
 <a-modal id="reseller-access-modal" v-model="resellerAccessModal.visible" title="Reseller Access"
-  :class="themeSwitcher.currentTheme" :confirm-loading="resellerAccessModal.saving" @ok="resellerAccessModal.save" width="640px">
+  :class="themeSwitcher.currentTheme" :confirm-loading="resellerAccessModal.saving" @ok="resellerAccessModal.save()" width="640px">
   <a-alert type="info" show-icon message="Client management for this inbound only"
     description="The reseller can manage clients and view their usage. Inbound settings and panel administration remain under your control." style="margin-bottom:16px"></a-alert>
   <a-form layout="vertical">
     <a-form-item label="Enable Reseller Access"><a-switch v-model="resellerAccessModal.form.enabled"></a-switch></a-form-item>
     <a-form-item label="Path ID">
-      <a-input v-model.trim="resellerAccessModal.form.path" placeholder="shop-one" :max-length="64"></a-input>
-      <small>3–64 letters, digits, underscores or hyphens. Changing the path revokes existing reseller sessions.</small>
+      <a-input v-model.trim="resellerAccessModal.form.path" placeholder="shop-one"></a-input>
+      <small>Choose your own URL path ID. Changing it revokes existing reseller sessions.</small>
     </a-form-item>
-    <a-form-item label="Username"><a-input v-model.trim="resellerAccessModal.form.username" autocomplete="off" :max-length="64"></a-input></a-form-item>
+    <a-form-item label="Username"><a-input v-model="resellerAccessModal.form.username" autocomplete="off"></a-input></a-form-item>
     <a-form-item label="Password">
       <a-input-password v-model="resellerAccessModal.form.password" autocomplete="new-password" placeholder="Leave blank to keep the current password"></a-input-password>
-      <small>At least 8 characters. A new password is required when enabling access for the first time.</small>
+      <small>Choose your own password. Leave blank to keep the saved password.</small>
     </a-form-item>
     <a-form-item label="Inbound Login URL">
       <a-input :value="resellerAccessModal.url" readonly>
-        <a-icon slot="addonAfter" type="copy" @click="resellerAccessModal.copyURL" style="cursor:pointer"></a-icon>
+        <a-icon slot="addonAfter" type="copy" @click="resellerAccessModal.copyURL()" style="cursor:pointer"></a-icon>
       </a-input>
       <small>Save changes before sharing this URL.</small>
     </a-form-item>
   </a-form>
   <a-collapse>
     <a-collapse-panel key="audit" header="Recent reseller activity">
-      <a-button size="small" icon="reload" @click="resellerAccessModal.loadAudit">Refresh activity</a-button>
+      <a-button size="small" icon="reload" @click="resellerAccessModal.loadAudit()">Refresh activity</a-button>
       <a-list :data-source="resellerAccessModal.audit" size="small" style="margin-top:8px;max-height:240px;overflow:auto">
         <a-list-item slot="renderItem" slot-scope="item">
           <div><strong>[[item.username]]</strong> · [[item.action]] · [[item.target]]<br>
@@ -38,7 +38,7 @@
     visible: false, saving: false, inboundId: 0, audit: [],
     form: {enabled:false,path:'',username:'',password:''},
     url: '',
-    updateURL() { this.url = this.form.path ? new URL(basePath + this.form.path + '/', location.origin).href : ''; },
+    updateURL() { this.url = this.form.path ? new URL(basePath + encodeURIComponent(this.form.path) + '/', location.origin).href : ''; },
     async show(inbound) {
       const response = await HttpUtil.get(`/panel/api/inbounds/${inbound.id}/reseller`);
       if (!response.success) return;
@@ -61,7 +61,7 @@
       const response = await HttpUtil.get(`/panel/api/inbounds/${inbound.id}/reseller`);
       if (!response.success) return;
       if (!response.obj?.enabled || !response.obj?.path) { app.$message.info('Enable Reseller Access and save its Path ID first.'); return; }
-      ClipboardManager.copyText(new URL(basePath + response.obj.path + '/', location.origin).href);
+      ClipboardManager.copyText(new URL(basePath + encodeURIComponent(response.obj.path) + '/', location.origin).href);
     },
     async loadAudit() {
       const response = await HttpUtil.get(`/panel/api/inbounds/${this.inboundId}/reseller/audit`);

@@ -27,8 +27,10 @@ Dataset provenance:
 Keep original license and attribution files when redistributing these resources.
 
 `payload-proxy.sh` is the built-in **X-UI Payload Proxy** manager. The installer
-runs `setup-payload-proxy.py` to install `/usr/local/bin/x-ui-proxy` and safely
-migrate existing instances. Access it with **x-ui → 4. Payload / Proxy**.
+runs `setup-payload-proxy.py` to install `/usr/local/bin/x-ui-proxy` without
+creating or importing instances. Access it with **x-ui → 4. Payload / Proxy**.
+Existing instances stay unchanged. Legacy migration is explicit using the
+setup helper's `--migrate-existing` flag, with rollback on failed service startup.
 
 `tdzp-client-ip.py` remains a compatibility helper for the legacy 1.2 relay with a private
 per-socket real-IP channel for `TDZ-IPLimit/2`. It preserves payload handshakes

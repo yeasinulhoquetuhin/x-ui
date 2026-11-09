@@ -18,7 +18,6 @@ import (
 	ws "github.com/gorilla/websocket"
 	"github.com/mhsanaei/3x-ui/v2/database/model"
 	"github.com/mhsanaei/3x-ui/v2/logger"
-	"github.com/mhsanaei/3x-ui/v2/util/crypto"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 )
@@ -123,7 +122,7 @@ func (a *ResellerController) resolve(c *gin.Context) {
 	}
 	root := c.GetString("base_path")
 	c.Set("asset_path", root)
-	c.Set("base_path", root+account.Path+"/")
+	c.Set("base_path", root+url.PathEscape(account.Path)+"/")
 	c.Set("is_reseller", true)
 	c.Set("reseller_account", account)
 	c.Header("Cache-Control", "no-store")
@@ -180,7 +179,7 @@ func (a *ResellerController) login(c *gin.Context) {
 		return
 	}
 	var form LoginForm
-	if c.ShouldBind(&form) != nil || len(form.Password) > 72 || form.Username != account.Username || !crypto.CheckPasswordHash(account.PasswordHash, form.Password) {
+	if c.ShouldBind(&form) != nil || form.Username != account.Username || !service.CheckResellerPassword(account.PasswordHash, form.Password) {
 		pureJsonMsg(c, http.StatusOK, false, "Invalid username or password")
 		return
 	}

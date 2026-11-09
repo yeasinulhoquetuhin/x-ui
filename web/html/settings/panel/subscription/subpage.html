@@ -175,7 +175,7 @@
                                 <a-descriptions-item label='{{ i18n "subscription.totalQuota" }}'>[[
                                     app.total
                                     ]]</a-descriptions-item>
-                                {{if .showIpLimit}}<a-descriptions-item label="IP Limit">{{.ipCount}}/{{.ipLimit}}</a-descriptions-item>{{end}}
+                                {{if .showIpLimit}}<a-descriptions-item label="IP Limit"><a-tag color="{{.ipLimitColor}}" style="margin:0">{{.ipCount}}/{{.ipLimit}}</a-tag></a-descriptions-item>{{end}}
                                 <a-descriptions-item v-if="app.totalByte > 0" label='{{ i18n "remained" }}'>[[
                                     app.remained ]]</a-descriptions-item>
                                 <a-descriptions-item label='{{ i18n "lastOnline" }}'>

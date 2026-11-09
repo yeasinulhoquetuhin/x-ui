@@ -61,7 +61,8 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 func (a *InboundController) resellerInbound(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.AbortWithStatus(400)
+		pureJsonMsg(c, 400, false, "Invalid inbound ID; reopen Reseller Access from the inbound menu")
+		c.Abort()
 		return 0, false
 	}
 	inbound, err := a.inboundService.GetInbound(id)

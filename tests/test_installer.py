@@ -57,14 +57,20 @@ source "$1"
 release=debian
 arch() { printf '%s' arm64; }
 curl() {
-    local destination=""
+    local destination="" url=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
           -fLRo|-4fLRo|-o) destination="$2"; shift 2 ;;
+          http*) url="$1"; shift ;;
           *) shift ;;
         esac
     done
-    if [[ -n "$destination" ]]; then cp "$TEST_ARCHIVE" "$destination"; else printf '%s\n' '{"tag_name":"v2.9.3-patched.1"}'; fi
+    if [[ -n "$destination" ]]; then
+        printf 'download %s\n' "$url" >> "$TEST_EVENTS"
+        cp "$TEST_ARCHIVE" "$destination"
+    else
+        printf '%s\n' '{"tag_name":"v2.9.3-patched.1","assets":[{"name":"x-ui-linux-arm64.tar.gz"}]}'
+    fi
 }
 systemctl() { printf 'service %s\n' "$*" >> "$TEST_EVENTS"; }
 install_x-ui
@@ -91,7 +97,7 @@ install_x-ui
         self.package(invalid=True)
         result = self.run_installer()
         self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(self.events.exists())
+        self.assertNotIn("service stop",self.events.read_text())
         self.assertEqual((self.app / "x-ui.sh").read_text(), "old-menu")
 
     def test_failed_migration_restores_previous_application(self):

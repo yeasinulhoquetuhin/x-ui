@@ -89,34 +89,34 @@ is_port_in_use() {
 }
 
 install_base() {
-    if [[ "$xui_existing_install" == true ]] && command -v curl >/dev/null && command -v tar >/dev/null && command -v openssl >/dev/null; then
+    if [[ "$xui_existing_install" == true ]] && command -v curl >/dev/null && command -v tar >/dev/null && command -v openssl >/dev/null && command -v python3 >/dev/null; then
         return 0
     fi
     case "${release}" in
         ubuntu | debian | armbian)
-            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
+            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl python3
         ;;
         fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
-            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl
+            dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl python3
         ;;
         centos)
             if [[ "${VERSION_ID}" =~ ^7 ]]; then
-                yum -y update && yum install -y cronie curl tar tzdata socat ca-certificates openssl
+                yum -y update && yum install -y cronie curl tar tzdata socat ca-certificates openssl python3
             else
-                dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl
+                dnf -y update && dnf install -y -q cronie curl tar tzdata socat ca-certificates openssl python3
             fi
         ;;
         arch | manjaro | parch)
-            pacman -Syu && pacman -Syu --noconfirm cronie curl tar tzdata socat ca-certificates openssl
+            pacman -Syu && pacman -Syu --noconfirm cronie curl tar tzdata socat ca-certificates openssl python
         ;;
         opensuse-tumbleweed | opensuse-leap)
-            zypper refresh && zypper -q install -y cron curl tar timezone socat ca-certificates openssl
+            zypper refresh && zypper -q install -y cron curl tar timezone socat ca-certificates openssl python3
         ;;
         alpine)
-            apk update && apk add dcron curl tar tzdata socat ca-certificates openssl
+            apk update && apk add dcron curl tar tzdata socat ca-certificates openssl python3
         ;;
         *)
-            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl
+            apt-get update && apt-get install -y -q cron curl tar tzdata socat ca-certificates openssl python3
         ;;
     esac
 }
@@ -816,45 +816,81 @@ config_after_install() {
     ${xui_folder}/x-ui migrate
 }
 
+# Resolve numeric shortcuts against published assets, never against source tags.
+xui_normalize_version() {
+    local value="$1"
+    if [[ "$value" =~ ^v?([0-9]+)$ ]]; then
+        printf 'v2.9.3-patched.%s\n' "$((10#${BASH_REMATCH[1]}))"
+    elif [[ "$value" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*$ ]]; then
+        printf 'v%s\n' "${value#v}"
+    else
+        return 1
+    fi
+}
+
+xui_release_json() {
+    local endpoint="$1"
+    curl -fsSL --connect-timeout 15 --max-time 60 "https://api.github.com/repos/yeasinulhoquetuhin/x-ui/releases${endpoint}" 2>/dev/null ||
+        curl -4fsSL --connect-timeout 15 --max-time 60 "https://api.github.com/repos/yeasinulhoquetuhin/x-ui/releases${endpoint}" 2>/dev/null
+}
+
+xui_release_tags() {
+    # Accept only published releases containing this server's package.
+    python3 -c 'import json,re,sys
+try:
+ data=json.load(sys.stdin); rows=data if isinstance(data,list) else [data]
+ for row in rows:
+  tag=row.get("tag_name", "")
+  if not row.get("draft", False) and re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*",tag) and any(asset.get("name")==sys.argv[1] for asset in row.get("assets",[])):
+   print(tag)
+except (ValueError,TypeError,AttributeError): sys.exit(1)' "x-ui-linux-$(arch).tar.gz"
+}
+
+xui_select_version() {
+    local requested="${1:-}" candidate latest catalog choice tag
+    if [[ -n "$requested" && "$requested" != latest ]]; then
+        candidate=$(xui_normalize_version "$requested") || { echo "Invalid version: $requested" >&2; return 1; }
+        tag=$(xui_release_json "/tags/$candidate" | xui_release_tags)
+        if [[ "$tag" == "$candidate" ]]; then tag_version="$tag"; return 0; fi
+    fi
+    latest=$(xui_release_json /latest | xui_release_tags)
+    if [[ -z "$latest" ]]; then
+        echo "Could not read an installable latest release. Please check GitHub access and try again." >&2
+        return 1
+    fi
+    if [[ -z "$requested" || "$requested" == latest ]]; then tag_version="$latest"; return 0; fi
+    echo -e "${yellow}Version ${requested} (${candidate}) is not available for $(arch).${plain}"
+    echo -e "${green}Latest available: ${latest}${plain}"
+    catalog=$(xui_release_json '?per_page=100' | xui_release_tags)
+    echo "Available versions (enter a shortcut such as v4, or a full tag):"
+    while IFS= read -r tag; do
+        [[ -n "$tag" ]] || continue
+        if [[ "$tag" =~ ^v2\.9\.3-patched\.([0-9]+)$ ]]; then echo "  v${BASH_REMATCH[1]}  -  $tag"; else echo "  $tag"; fi
+    done <<< "$catalog"
+    while true; do
+        read -rp "Install ${latest}? [y/n], or enter another version: " choice || return 1
+        case "$choice" in
+            y|Y|yes|YES) tag_version="$latest"; return 0 ;;
+            n|N|no|NO|0) echo "Installation cancelled."; return 1 ;;
+            '') continue ;;
+        esac
+        candidate=$(xui_normalize_version "$choice") || { echo "Invalid version: $choice"; continue; }
+        tag=$(xui_release_json "/tags/$candidate" | xui_release_tags)
+        if [[ "$tag" == "$candidate" ]]; then tag_version="$tag"; return 0; fi
+        echo "Version $choice is unavailable. Choose a listed version or y for $latest."
+    done
+}
+
 install_x-ui() {
+    xui_select_version "${1:-}" || return 1
     mkdir -p "$(dirname "$xui_folder")" || return 1
     cd "$(dirname "$xui_folder")" || return 1
-    
-    # Download resources
-    if [ $# == 0 ]; then
-        tag_version=$(curl -Ls "https://api.github.com/repos/yeasinulhoquetuhin/x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$tag_version" ]]; then
-            echo -e "${yellow}Trying to fetch version with IPv4...${plain}"
-            tag_version=$(curl -4 -Ls "https://api.github.com/repos/yeasinulhoquetuhin/x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-            if [[ ! -n "$tag_version" ]]; then
-                echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
-                exit 1
-            fi
-        fi
-        echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -fLRo "${xui_folder}-linux-$(arch).tar.gz" "https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
-            exit 1
-        fi
-    else
-        tag_version=$1
-        tag_version_numeric=${tag_version#v}
-        min_version="2.3.5"
-        
-        if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-            echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
-            exit 1
-        fi
-        
-        url="https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
-        echo -e "Beginning to install x-ui $1"
-        curl -fLRo "${xui_folder}-linux-$(arch).tar.gz" "$url"
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
-            exit 1
-        fi
-    fi
+    echo -e "Beginning installation of x-ui ${tag_version}..."
+    url="https://github.com/yeasinulhoquetuhin/x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
+    curl -fLRo "${xui_folder}-linux-$(arch).tar.gz" "$url" || {
+        echo -e "${red}Downloading x-ui ${tag_version} failed; no installation was started.${plain}"
+        exit 1
+    }
     # Validate and stage the download before stopping the existing panel.
     local stage
     stage=$(mktemp -d "${xui_folder}.stage.XXXXXX") || return 1
@@ -916,7 +952,7 @@ install_x-ui() {
         return 1
     fi
 
-    # Install the bundled manager and preserve existing public/backend proxy ports.
+    # Install only the manager. Creating/importing proxy instances is explicit.
     if [[ -f "$xui_folder/resources/setup-payload-proxy.py" ]] && command -v python3 >/dev/null && command -v systemctl >/dev/null; then
         if ! python3 "$xui_folder/resources/setup-payload-proxy.py" "$xui_folder/resources/payload-proxy.sh"; then
             echo "Payload / Proxy setup failed; see the error above. Existing proxy settings were preserved."

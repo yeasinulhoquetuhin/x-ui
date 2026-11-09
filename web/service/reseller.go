@@ -1,13 +1,14 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/mhsanaei/3x-ui/v2/database"
@@ -27,14 +28,14 @@ type ResellerAccessForm struct {
 }
 
 var resellerSettingsMu sync.Mutex
-var resellerPathPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$`)
+var resellerPathPattern = regexp.MustCompile(`^[\p{L}\p{N}_.~-]+$`)
 var resellerSubIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
 func ValidResellerPath(path string) bool {
 	if !resellerPathPattern.MatchString(path) {
 		return false
 	}
-	if strings.HasPrefix(strings.ToLower(path), "xui") {
+	if path == "." || path == ".." {
 		return false
 	}
 	switch strings.ToLower(path) {
@@ -42,6 +43,27 @@ func ValidResellerPath(path string) bool {
 		return false
 	}
 	return true
+}
+
+const resellerPasswordPrefix = "$xui-bcrypt-sha256$"
+
+// Prehashing supports any password length without bcrypt's 72-byte truncation.
+// Existing reseller bcrypt hashes remain valid after an in-place update.
+func hashResellerPassword(password string) (string, error) {
+	digest := sha256.Sum256([]byte(password))
+	hash, err := crypto.HashPasswordAsBcrypt(base64.StdEncoding.EncodeToString(digest[:]))
+	if err != nil {
+		return "", err
+	}
+	return resellerPasswordPrefix + hash, nil
+}
+
+func CheckResellerPassword(hash, password string) bool {
+	if strings.HasPrefix(hash, resellerPasswordPrefix) {
+		digest := sha256.Sum256([]byte(password))
+		return crypto.CheckPasswordHash(strings.TrimPrefix(hash, resellerPasswordPrefix), base64.StdEncoding.EncodeToString(digest[:]))
+	}
+	return crypto.CheckPasswordHash(hash, password)
 }
 
 func (s *ResellerService) Get(inboundID int) (*model.ResellerAccess, error) {
@@ -130,13 +152,10 @@ func (s *ResellerService) Save(inboundID int, form ResellerAccessForm) (*model.R
 		return account, nil
 	}
 	if !ValidResellerPath(form.Path) {
-		return nil, errors.New("path ID must be 3-64 letters, digits, underscores or hyphens and must not be reserved")
+		return nil, errors.New("choose a non-empty URL path ID using letters, numbers, dots, underscores, hyphens or ~; this path must not be reserved")
 	}
-	if form.Username == "" || strings.TrimSpace(form.Username) != form.Username || utf8.RuneCountInString(form.Username) > 64 {
-		return nil, errors.New("username must contain 1-64 characters without surrounding spaces")
-	}
-	if form.Password != "" && (len(form.Password) > 72 || utf8.RuneCountInString(form.Password) < 8) {
-		return nil, errors.New("password must contain at least 8 characters and at most 72 bytes")
+	if strings.TrimSpace(form.Username) == "" {
+		return nil, errors.New("username is required")
 	}
 	var count int64
 	if err := database.GetDB().Model(&model.ResellerAccess{}).Where("LOWER(path) = LOWER(?) AND inbound_id <> ?", form.Path, inboundID).Count(&count).Error; err != nil {
@@ -147,7 +166,7 @@ func (s *ResellerService) Save(inboundID int, form ResellerAccessForm) (*model.R
 	}
 	changed := account.Enabled != form.Enabled || account.Path != form.Path || account.Username != form.Username
 	if form.Password != "" {
-		hash, err := crypto.HashPasswordAsBcrypt(form.Password)
+		hash, err := hashResellerPassword(form.Password)
 		if err != nil {
 			return nil, err
 		}
