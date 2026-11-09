@@ -108,7 +108,7 @@ func TestResellerClientIdentitiesAreIsolated(t *testing.T) {
 	for _, client := range []model.Client{
 		{Email: "new", ID: "new-id", SubID: "foreign-sub"},
 		{Email: "foreign", ID: "new-id", SubID: "new-sub"},
-		{Email: "new", ID: "foreign-id", SubID: "new-sub"},
+		{Email: "new", ID: "own-id", SubID: "new-sub"},
 	} {
 		if err := service.ValidateClients(owner, []model.Client{client}, ""); err == nil {
 			t.Fatalf("foreign identity accepted %+v", client)
@@ -141,7 +141,46 @@ func TestResellerAccessRejectsExistingCrossInboundClientIdentity(t *testing.T) {
 	inbound := resellerTestInbound(t, "identity-one", []model.Client{{Email: "shared-email", ID: "one", SubID: "sub-one"}})
 	resellerTestInbound(t, "identity-two", []model.Client{{Email: "SHARED-EMAIL", ID: "two", SubID: "sub-two"}})
 	var service ResellerService
-	if _, err := service.Save(inbound.Id, ResellerAccessForm{Enabled: true, Path: "identity-shop", Username: "shop", Password: "shop-password"}); err == nil {
-		t.Fatal("cross-inbound client identity exposed to reseller")
+	if _, err := service.Save(inbound.Id, ResellerAccessForm{Enabled: true, Path: "identity-shop", Username: "shop", Password: "shop-password"}); err == nil || !strings.Contains(err.Error(), `"shared-email"`) || !strings.Contains(err.Error(), "inbound 2") {
+		t.Fatalf("cross-inbound email conflict was not identified: %v", err)
+	}
+}
+
+func TestResellerAccessAllowsInboundScopedAuthentication(t *testing.T) {
+	for _, protocol := range []model.Protocol{model.VLESS, model.VMESS, model.Trojan, model.Hysteria, model.Hysteria2} {
+		t.Run(string(protocol), func(t *testing.T) {
+			setupClientResetDB(t)
+			first := model.Client{Email: "first-client", ID: "127bb13c-fec7-4b96-a6c8-7cc16b847803", Password: "shared-password", Auth: "shared-auth", SubID: "first-sub", Enable: true}
+			second := first
+			second.Email, second.SubID = "second-client", "second-sub"
+			owner := resellerTestInbound(t, "first-inbound", []model.Client{first})
+			other := resellerTestInbound(t, "second-inbound", []model.Client{second})
+			for _, inbound := range []*model.Inbound{owner, other} {
+				inbound.Protocol = protocol
+				if err := database.GetDB().Save(inbound).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			var service ResellerService
+			for i, inbound := range []*model.Inbound{owner, other} {
+				path := []string{"first-shop", "second-shop"}[i]
+				if _, err := service.Save(inbound.Id, ResellerAccessForm{Enabled: true, Path: path, Username: "shop", Password: "password"}); err != nil {
+					t.Fatalf("independent inbound authentication blocked reseller access: %v", err)
+				}
+			}
+			if err := service.ValidateClients(owner, []model.Client{first}, ResellerClientID(protocol, first)); err != nil {
+				t.Fatalf("editing own client blocked by another inbound's credentials: %v", err)
+			}
+			newClient := first
+			newClient.Email, newClient.SubID = "third-client", "third-sub"
+			if err := service.ValidateClients(owner, []model.Client{newClient}, ""); err == nil {
+				t.Fatal("duplicate authentication accepted inside the same inbound")
+			}
+			empty := resellerTestInbound(t, "third-inbound", nil)
+			empty.Protocol = protocol
+			if err := service.ValidateClients(empty, []model.Client{newClient}, ""); err != nil {
+				t.Fatalf("creating a client with inbound-scoped credentials failed: %v", err)
+			}
+		})
 	}
 }

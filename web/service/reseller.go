@@ -141,8 +141,10 @@ func (s *ResellerService) Save(inboundID int, form ResellerAccessForm) (*model.R
 			}
 			for _, client := range clients {
 				for _, candidate := range rows {
-					if client.Email != "" && strings.EqualFold(client.Email, candidate.Email) || inbound.Protocol == other.Protocol && resellerAuthenticationID(inbound.Protocol, client) != "" && resellerAuthenticationID(inbound.Protocol, client) == resellerAuthenticationID(other.Protocol, candidate) {
-						return nil, errors.New("this inbound shares client identities with another inbound; use separate client identities before enabling reseller access")
+					// Email drives global traffic/IP accounting, but UUIDs and
+					// protocol passwords authenticate within each inbound only.
+					if client.Email != "" && strings.EqualFold(client.Email, candidate.Email) {
+						return nil, fmt.Errorf("client email/name %q is also used by inbound %d; use a separate email/name before enabling reseller access", client.Email, other.Id)
 					}
 				}
 			}
@@ -268,8 +270,8 @@ func resellerAuthenticationID(protocol model.Protocol, client model.Client) stri
 	return identity
 }
 
-// ValidateClients prevents a reseller from joining another account's subscription
-// or reusing its authentication identity through the shared underlying core.
+// ValidateClients keeps global accounting/subscriptions isolated and prevents
+// ambiguous authentication identities inside the assigned inbound.
 func (s *ResellerService) ValidateClients(inbound *model.Inbound, clients []model.Client, replacing string) error {
 	if len(clients) == 0 || replacing != "" && len(clients) != 1 {
 		return errors.New("provide the client records to manage")
@@ -298,7 +300,7 @@ func (s *ResellerService) ValidateClients(inbound *model.Inbound, clients []mode
 				if candidate.Id == inbound.Id && replacing != "" && ResellerClientID(candidate.Protocol, other) == replacing {
 					continue
 				}
-				if strings.EqualFold(client.Email, other.Email) || candidate.Protocol == inbound.Protocol && resellerAuthenticationID(inbound.Protocol, client) == resellerAuthenticationID(candidate.Protocol, other) || client.SubID != "" && client.SubID == other.SubID && candidate.Id != inbound.Id {
+				if strings.EqualFold(client.Email, other.Email) || candidate.Id == inbound.Id && resellerAuthenticationID(inbound.Protocol, client) == resellerAuthenticationID(candidate.Protocol, other) || client.SubID != "" && client.SubID == other.SubID && candidate.Id != inbound.Id {
 					return errors.New("client identity or subscription ID is already in use")
 				}
 			}

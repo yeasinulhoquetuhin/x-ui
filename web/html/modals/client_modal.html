@@ -127,16 +127,24 @@
         },
         methods: {
             async getDBClientIps(email) {
+                const requestID = this.clientIpRequestID = (this.clientIpRequestID || 0) + 1;
                 const result = await refreshIPs(email);
-                document.getElementById("clientIPs").value = result.array.length ? result.array.join("\n") : result.text;
+                const field = document.getElementById("clientIPs");
+                if (requestID === this.clientIpRequestID && this.client?.email === email && field) {
+                    field.value = result.array.length ? result.array.join("\n") : result.text;
+                }
             },
             async clearDBClientIps(email) {
+                const requestID = this.clientIpRequestID = (this.clientIpRequestID || 0) + 1;
                 try {
-                    const msg = await HttpUtil.post(`/panel/api/inbounds/clearClientIps/${email}`);
+                    const msg = await HttpUtil.post(`/panel/api/inbounds/clearClientIps/${encodeURIComponent(email)}`);
                     if (!msg.success) {
                         return;
                     }
-                    await this.getDBClientIps(email);
+                    const field = document.getElementById("clientIPs");
+                    if (requestID === this.clientIpRequestID && this.client?.email === email && field) {
+                        field.value = '';
+                    }
                 } catch (error) {
                 }
             },

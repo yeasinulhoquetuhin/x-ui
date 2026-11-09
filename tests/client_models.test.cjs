@@ -43,3 +43,69 @@ test('IP display handles empty and failed snapshots without counting placeholder
   ctx.HttpUtil.post = async () => { throw new Error('API disconnected'); };
   assert.equal((await ctx.refreshIPs('client')).error, true);
 });
+
+function ipDetailsContext(post) {
+  const html = fs.readFileSync(path.join(root, 'web/html/modals/inbound_info_modal.html'), 'utf8');
+  const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  const ctx = vm.createContext({
+    Inbound: class {}, DBInbound: class {},
+    HttpUtil: {post}, document: {head: {insertAdjacentHTML() {}}},
+    Vue: function(options) {
+      const view = Object.assign({}, options.data, options.methods);
+      for (const [key, property] of Object.entries(options.computed || {})) {
+        Object.defineProperty(view, key, {get: property.get, set: property.set});
+      }
+      return view;
+    },
+  });
+  vm.runInContext(script + '\nthis.modal = infoModal; this.view = infoModalApp;', ctx);
+  ctx.modal.visible = true;
+  ctx.modal.clientSettings = {email: 'client@example.com', limitIp: 2};
+  ctx.modal.clientIps = '192.0.2.1';
+  ctx.modal.clientIpsArray = ['192.0.2.1'];
+  return ctx;
+}
+
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+test('clearing IP details does not refresh and cannot be undone by an older response', async () => {
+  const calls = [];
+  let finishOldRefresh;
+  const ctx = ipDetailsContext(url => {
+    calls.push(url);
+    if (url.includes('/clearClientIps/')) return Promise.resolve({success: true});
+    return new Promise(resolve => {finishOldRefresh = resolve;});
+  });
+  ctx.view.refreshIPs();
+  ctx.view.clearClientIps();
+  await settle();
+  assert.equal(calls.length, 2);
+  assert(calls[1].endsWith('/clearClientIps/client%40example.com'));
+  assert.equal(ctx.modal.clientIpsArray.length, 0);
+  assert.equal(ctx.view.refreshing, false);
+  finishOldRefresh({success: true, obj: ['192.0.2.1']});
+  await settle();
+  assert.equal(ctx.modal.clientIpsArray.length, 0, 'old refresh repopulated cleared records');
+  ctx.HttpUtil.post = async url => {
+    calls.push(url);
+    return {success: true, obj: ['192.0.2.2']};
+  };
+  ctx.view.refreshIPs();
+  await settle();
+  assert.equal(ctx.modal.clientIpsArray[0], '192.0.2.2', 'explicit refresh stopped working');
+});
+
+test('failed clears preserve the displayed snapshot and cannot erase another client', async () => {
+  const ctx = ipDetailsContext(async () => ({success: false}));
+  ctx.view.clearClientIps();
+  await settle();
+  assert.equal(ctx.modal.clientIpsArray[0], '192.0.2.1');
+  let finishClear;
+  ctx.HttpUtil.post = () => new Promise(resolve => {finishClear = resolve;});
+  ctx.view.clearClientIps();
+  ctx.modal.clientSettings = {email: 'other-client'};
+  ctx.modal.clientIpsArray = ['192.0.2.3'];
+  finishClear({success: true});
+  await settle();
+  assert.equal(ctx.modal.clientIpsArray[0], '192.0.2.3');
+});

@@ -96,6 +96,10 @@ func (a *InboundController) saveResellerAccess(c *gin.Context) {
 	}
 	var reseller service.ResellerService
 	account, err := reseller.Save(id, form)
+	if err != nil {
+		jsonObj(c, nil, err)
+		return
+	}
 	jsonMsgObj(c, "Reseller access saved", account, err)
 }
 

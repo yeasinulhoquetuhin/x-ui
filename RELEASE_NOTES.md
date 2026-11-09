@@ -1,5 +1,12 @@
 # TDZ X-UI v2.9.3-patched.2
 
+## Reseller and IP-details hotfix
+
+- Allow the same protocol UUID/password on separate inbounds. Reseller activation and client edits now respect inbound-scoped authentication while keeping client emails and subscriptions isolated.
+- Identify the conflicting client email and inbound when a real accounting conflict exists. Failed reseller saves no longer display a success prefix.
+- Clear IP records without automatically refreshing them in client details or the editor. Ignore older in-flight detail refreshes after clearing; use Refresh to fetch connected IPs again.
+- Remove the requested Traffic Reset details explanation and subscription IP-limit helper text.
+
 ## Final UI refinements
 
 - Remove the extra reseller-name/dashboard badge and Total Inbounds statistic from the reseller view. Administrator overview statistics stay available.

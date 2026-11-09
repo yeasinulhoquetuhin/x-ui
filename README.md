@@ -87,6 +87,8 @@ Changing the reseller username, password, or Path ID, disabling access, or delet
 
 Path IDs and credentials have no arbitrary minimum-length rule. The path must remain a valid, non-empty URL segment and must not conflict with reserved panel routes. Passwords are hashed; an empty password field when editing keeps the existing password.
 
+Client authentication is inbound-scoped: separate inbounds may use the same protocol UUID/password. Client emails/names and subscription IDs remain separate across reseller inbounds so usage and subscription access stay isolated. A conflicting email is identified with its inbound number when saving.
+
 ## Native IP limits
 
 IP admission is enforced inside the bundled Xray core before an authenticated stream is routed:
@@ -95,6 +97,7 @@ IP admission is enforced inside the bundled Xray core before an authenticated st
 - Once the limit is full, a new source IP is rejected while the first admitted IP continues working.
 - Closing the last stream from an IP releases its slot, including MUX sessions.
 - Client IP details show the core's current connection snapshot. Open the details or use **Refresh** to update it; no automatic IP-log polling is enabled.
+- **Clear** removes the stored/displayed IP records without fetching another snapshot. Connected IPs appear again when you explicitly refresh or reopen the details.
 
 IP limits count source addresses, not physical devices. Devices sharing one public IP occupy one IP slot. Limited accounts reject unresolved local/private relay addresses rather than silently treating all proxied clients as one IP.
 

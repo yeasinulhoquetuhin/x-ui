@@ -211,7 +211,6 @@
                 <span v-else-if="infoModal.clientSettings.expiryTime < 0">Starts after first use</span>
                 <span v-else>Pending schedule</span>
               </div>
-              <small style="display:block;opacity:.7;white-space:normal">Resets used traffic only; quota and account expiry stay the same.</small>
             </template>
           </td>
         </tr>
@@ -286,12 +285,12 @@
               </a-spin>
             </div>
             <div style="margin-top: 5px;">
-              <a-icon type="sync" :spin="refreshing" @click="refreshIPs" :style="{ margin: '0 5px', cursor: 'pointer' }"></a-icon>
+              <a-icon type="sync" :spin="refreshing" @click.stop="refreshIPs" :style="{ margin: '0 5px', cursor: 'pointer' }"></a-icon>
               <a-tooltip>
                 <template slot="title">
                   <span>{{ i18n "pages.inbounds.IPLimitlogclear" }}</span>
                 </template>
-                <a-icon type="delete" @click="clearClientIps" style="cursor: pointer;"></a-icon>
+                <a-icon type="delete" @click.stop="clearClientIps" style="cursor: pointer;"></a-icon>
               </a-tooltip>
             </div>
           </td>
@@ -557,7 +556,7 @@
 </a-modal>
 <script>
   function refreshIPs(email) {
-    return HttpUtil.post(`/panel/api/inbounds/clientIps/${email}`).then((msg) => {
+    return HttpUtil.post(`/panel/api/inbounds/clientIps/${encodeURIComponent(email)}`).then((msg) => {
       if (!msg.success) {
         return { text: 'Live IP tracking unavailable', array: [], error: true };
       }
@@ -652,9 +651,17 @@
     clientIps: '',
     clientIpsArray: [],
     ipTrackingError: false,
+    ipRequestID: 0,
+    clearingIps: false,
+    loadingIps: false,
+    refreshing: false,
     show(dbInbound, index) {
-	  this.clientIps = '';
-	  this.clientIpsArray = [];
+      const requestID = ++this.ipRequestID;
+      this.clearingIps = false;
+      this.loadingIps = false;
+      this.refreshing = false;
+      this.clientIps = '';
+      this.clientIpsArray = [];
       this.ipTrackingError = false;
       this.index = index;
       this.inbound = dbInbound.toInbound();
@@ -668,12 +675,12 @@
           this.loadingIps = true;
           const email = this.clientSettings.email;
           refreshIPs(email).then((result) => {
-            if (!this.clientSettings || this.clientSettings.email !== email) return;
+            if (this.ipRequestID !== requestID || !this.clientSettings || this.clientSettings.email !== email) return;
             this.clientIps = result.text;
             this.clientIpsArray = result.array;
             this.ipTrackingError = !!result.error;
           }).finally(() => {
-            this.loadingIps = false;
+            if (this.ipRequestID === requestID) this.loadingIps = false;
           })
         }
       }
@@ -693,6 +700,10 @@
       this.visible = true;
     },
     close() {
+      this.ipRequestID++;
+      this.clearingIps = false;
+      this.loadingIps = false;
+      this.refreshing = false;
       infoModal.visible = false;
     },
     genSubLink(subID) {
@@ -710,8 +721,6 @@
     el: '#inbound-info-modal',
     data: {
       infoModal,
-      refreshing: false,
-      loadingIps: false,
       get dbInbound() {
         return this.infoModal.dbInbound;
       },
@@ -747,6 +756,16 @@
         const expired = hasExpiry && now >= expiryTime;
 
         return expired || exhausted;
+      },
+    },
+    computed: {
+      refreshing: {
+        get() { return this.infoModal.refreshing; },
+        set(value) { this.infoModal.refreshing = value; },
+      },
+      loadingIps: {
+        get() { return this.infoModal.loadingIps; },
+        set(value) { this.infoModal.loadingIps = value; },
       },
     },
     methods: {
@@ -812,30 +831,46 @@
         return remained > 0 ? SizeFormatter.sizeFormat(remained) : '-';
       },
       refreshIPs() {
+        if (this.infoModal.clearingIps || !this.infoModal.clientSettings) return;
+        const requestID = ++this.infoModal.ipRequestID;
         this.refreshing = true;
         this.loadingIps = true;
         const email = this.infoModal.clientSettings.email;
         refreshIPs(email)
           .then((result) => {
-            if (!this.infoModal.visible || !this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) return;
+            if (this.infoModal.ipRequestID !== requestID || !this.infoModal.visible || !this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) return;
             this.infoModal.clientIps = result.text;
             this.infoModal.clientIpsArray = result.array;
             this.infoModal.ipTrackingError = !!result.error;
           })
           .finally(() => {
+            if (this.infoModal.ipRequestID !== requestID) return;
             this.refreshing = false;
             this.loadingIps = false;
           });
       },
       clearClientIps() {
-        HttpUtil.post(`/panel/api/inbounds/clearClientIps/${this.infoModal.clientSettings.email}`)
+        if (this.infoModal.clearingIps || !this.infoModal.clientSettings) return;
+        const requestID = ++this.infoModal.ipRequestID;
+        const email = this.infoModal.clientSettings.email;
+        this.infoModal.clearingIps = true;
+        this.refreshing = false;
+        this.loadingIps = true;
+        HttpUtil.post(`/panel/api/inbounds/clearClientIps/${encodeURIComponent(email)}`)
           .then((msg) => {
-            if (!msg.success) {
+            if (!msg.success || this.infoModal.ipRequestID !== requestID || !this.infoModal.clientSettings || this.infoModal.clientSettings.email !== email) {
               return;
             }
-            this.refreshIPs();
+            this.infoModal.clientIps = 'No IP Record';
+            this.infoModal.clientIpsArray = [];
+            this.infoModal.ipTrackingError = false;
           })
-          .catch(() => { });
+          .catch(() => { })
+          .finally(() => {
+            if (this.infoModal.ipRequestID !== requestID) return;
+            this.infoModal.clearingIps = false;
+            this.loadingIps = false;
+          });
       },
     },
   });
