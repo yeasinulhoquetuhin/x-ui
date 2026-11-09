@@ -3,7 +3,7 @@
 - Fix TDZ payload-proxy client IPs using a private, live-socket-validated IP channel. Payload handshake, relay bytes and proxy ports are preserved.
 - Limited accounts reject unresolved local/private proxy sources instead of treating all proxied devices as one IP. New IPs are rejected while slots are full; the first admitted IP remains connected.
 - HTTP forwarded-IP headers are trusted only from explicitly configured proxy peers; direct connections and unconfigured payload relays cannot choose their counted IP through client-supplied headers.
-- Client info refreshes live IPs/counts every two seconds while open. Failed tracking is shown as unavailable, and clearing the display cannot conceal an active IP.
+- Client details load live IPs/counts once when opened; use the Refresh button for subsequent updates. Failed tracking is shown as unavailable, and clearing the display cannot conceal an active IP.
 - Add **Hourly** and **12 Hourly** Traffic Reset schedules, anchored to activation and catching up after downtime.
 
 - Hotfix: client Telegram IDs accept empty strings, numeric strings, JSON numbers, null and omitted fields. Existing client records and client forms work without a database reset.

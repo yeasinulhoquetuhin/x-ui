@@ -635,7 +635,6 @@
     clientIps: '',
     clientIpsArray: [],
     ipTrackingError: false,
-    ipRefreshTimer: null,
     show(dbInbound, index) {
 	  this.clientIps = '';
 	  this.clientIpsArray = [];
@@ -678,8 +677,6 @@
     },
     close() {
       infoModal.visible = false;
-      clearInterval(this.ipRefreshTimer);
-      this.ipRefreshTimer = null;
     },
     genSubLink(subID) {
       return app.subSettings.subURI + subID;
@@ -733,17 +730,6 @@
         const expired = hasExpiry && now >= expiryTime;
 
         return expired || exhausted;
-      },
-    },
-    watch: {
-      'infoModal.visible'(visible) {
-        clearInterval(this.infoModal.ipRefreshTimer);
-        this.infoModal.ipRefreshTimer = null;
-        if (visible && app.ipLimitEnable && this.infoModal.clientSettings?.email) {
-          this.infoModal.ipRefreshTimer = setInterval(() => {
-            if (!this.refreshing) this.refreshIPs();
-          }, 2000);
-        }
       },
     },
     methods: {
