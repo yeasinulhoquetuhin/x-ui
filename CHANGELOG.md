@@ -19,6 +19,7 @@
 
 ### Fixed
 
+- Inbound edits commit their database changes before updating the live Xray listener, avoiding lock errors during background traffic updates and preventing failed saves from changing the active listener.
 - IP SSL issuance from View Current Settings no longer enters a hidden nested menu; recovery restores a previously running panel on failure/cancellation.
 - Busy-port detection and progress/time limits for certificate dependencies and ACME commands.
 - Native payload compatibility with the original TDZ proxy, including CONNECT's fixed 101 response, fragmented/coalesced headers and preservation of every byte after the first CRLFCRLF.

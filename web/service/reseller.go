@@ -575,7 +575,7 @@ func (s *ResellerService) UpdateInbound(account *model.ResellerAccount, id int, 
 		return false, err
 	}
 	var inboundService InboundService
-	_, restart, err := inboundService.UpdateInbound(data)
+	_, restart, err := inboundService.updateInbound(data)
 	return restart, err
 }
 
@@ -591,6 +591,6 @@ func (s *ResellerService) ToggleInbound(account *model.ResellerAccount, id int, 
 		return false, err
 	}
 	data.Enable = enabled
-	_, restart, err := inboundService.UpdateInbound(data)
+	_, restart, err := inboundService.updateInbound(data)
 	return restart, err
 }

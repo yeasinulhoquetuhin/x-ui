@@ -23,6 +23,7 @@ See [ACCEPT_PAYLOADS.md](ACCEPT_PAYLOADS.md) for the exact response, limits and 
 
 ## Client links and CLI fixes
 
+- Inbound edits commit database changes before updating Xray, preventing save failures from leaving a different live listener and reducing database-lock conflicts with background statistics.
 - Removed inbound-name prefixes from client subscription URI/JSON/Clash labels, Telegram-delivered config links and panel copy/export/QR actions.
 - Removed the main CLI Payload / Proxy entry and renumbered choices through **25**. Legacy instances remain accessible through `x-ui-proxy`.
 - Fixed the hidden nested menu that stalled IP SSL setup from **9. View Current Settings**. Accepts `y`, `yes` and `-y`; busy-port detection, visible dependency progress, operation timeouts and service recovery on failure/cancellation are included.

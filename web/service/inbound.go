@@ -406,6 +406,13 @@ func (s *InboundService) GetInbound(id int) (*model.Inbound, error) {
 // It validates changes, updates the database, and syncs with the running Xray instance.
 // Returns the updated inbound, whether Xray needs restart, and any error.
 func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
+	clientTrafficMu.Lock()
+	defer clientTrafficMu.Unlock()
+	return s.updateInbound(inbound)
+}
+
+// Callers already holding clientTrafficMu (reseller edits) use this helper.
+func (s *InboundService) updateInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
 	if _, err := xray.InjectPayloadEnabled([]byte(inbound.StreamSettings)); err != nil {
 		return inbound, false, err
 	}
@@ -423,22 +430,7 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 	}
 
 	tag := oldInbound.Tag
-
-	db := database.GetDB()
-	tx := db.Begin()
-
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		} else {
-			tx.Commit()
-		}
-	}()
-
-	err = s.updateClientTraffics(tx, oldInbound, inbound)
-	if err != nil {
-		return inbound, false, err
-	}
+	original := *oldInbound
 
 	// Ensure created_at and updated_at exist in inbound.Settings clients
 	{
@@ -518,35 +510,55 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 		oldInbound.Tag = fmt.Sprintf("inbound-%v:%v", inbound.Listen, inbound.Port)
 	}
 
+	// Reserve the SQLite write lock before reading traffic rows, and commit
+	// before any potentially slow Xray call. A failed save must not change the
+	// live listener or leave a read transaction racing background statistics.
+	runtimeInbound := oldInbound
+	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(oldInbound).Error; err != nil {
+			return err
+		}
+		if err := s.updateClientTraffics(tx, &original, oldInbound); err != nil {
+			return err
+		}
+		if oldInbound.Enable {
+			var err error
+			runtimeInbound, err = s.buildRuntimeInboundForAPI(tx, oldInbound)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return inbound, false, err
+	}
+	if p == nil {
+		return oldInbound, true, nil
+	}
+	if err := s.xrayApi.Init(p.GetAPIPort()); err != nil {
+		return oldInbound, true, nil
+	}
+	defer s.xrayApi.Close()
 	needRestart := false
-	s.xrayApi.Init(p.GetAPIPort())
 	if s.xrayApi.DelInbound(tag) == nil {
 		logger.Debug("Old inbound deleted by api:", tag)
 	}
 	if inbound.Enable {
-		runtimeInbound, err2 := s.buildRuntimeInboundForAPI(tx, oldInbound)
+		inboundJson, err2 := json.MarshalIndent(runtimeInbound.GenXrayInboundConfig(), "", "  ")
 		if err2 != nil {
-			logger.Debug("Unable to prepare runtime inbound config:", err2)
+			logger.Debug("Unable to marshal updated inbound config:", err2)
 			needRestart = true
 		} else {
-			inboundJson, err2 := json.MarshalIndent(runtimeInbound.GenXrayInboundConfig(), "", "  ")
-			if err2 != nil {
-				logger.Debug("Unable to marshal updated inbound config:", err2)
-				needRestart = true
+			err2 = s.xrayApi.AddInbound(inboundJson)
+			if err2 == nil {
+				logger.Debug("Updated inbound added by api:", oldInbound.Tag)
 			} else {
-				err2 = s.xrayApi.AddInbound(inboundJson)
-				if err2 == nil {
-					logger.Debug("Updated inbound added by api:", oldInbound.Tag)
-				} else {
-					logger.Debug("Unable to update inbound by api:", err2)
-					needRestart = true
-				}
+				logger.Debug("Unable to update inbound by api:", err2)
+				needRestart = true
 			}
 		}
 	}
-	s.xrayApi.Close()
 
-	return inbound, needRestart, tx.Save(oldInbound).Error
+	return oldInbound, needRestart, nil
 }
 
 func (s *InboundService) buildRuntimeInboundForAPI(tx *gorm.DB, inbound *model.Inbound) (*model.Inbound, error) {
