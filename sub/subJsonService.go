@@ -238,6 +238,7 @@ func (s *SubJsonService) streamData(stream string) map[string]any {
 		streamSettings["realitySettings"] = s.realityData(streamSettings["realitySettings"].(map[string]any))
 	}
 	delete(streamSettings, "sockopt")
+	delete(streamSettings, "acceptPayloads")
 
 	if s.fragmentOrNoises {
 		streamSettings["sockopt"] = json_util.RawMessage(`{"dialerProxy": "direct_out", "tcpKeepAliveIdle": 100}`)
@@ -248,6 +249,8 @@ func (s *SubJsonService) streamData(stream string) map[string]any {
 	switch network {
 	case "tcp":
 		streamSettings["tcpSettings"] = s.removeAcceptProxy(streamSettings["tcpSettings"])
+	case "raw":
+		streamSettings["rawSettings"] = s.removeAcceptProxy(streamSettings["rawSettings"])
 	case "ws":
 		streamSettings["wsSettings"] = s.removeAcceptProxy(streamSettings["wsSettings"])
 	case "httpupgrade":
@@ -260,6 +263,7 @@ func (s *SubJsonService) removeAcceptProxy(setting any) map[string]any {
 	netSettings, ok := setting.(map[string]any)
 	if ok {
 		delete(netSettings, "acceptProxyProtocol")
+		delete(netSettings, "injectPayload")
 	}
 	return netSettings
 }

@@ -23,11 +23,11 @@ function LOGI() {
 is_port_in_use() {
     local port="$1"
     if command -v ss >/dev/null 2>&1; then
-        ss -ltn 2>/dev/null | awk -v p=":${port}$" '$4 ~ p {exit 0} END {exit 1}'
+        ss -ltn 2>/dev/null | awk -v p=":${port}$" '$4 ~ p {found=1} END {exit !found}'
         return
     fi
     if command -v netstat >/dev/null 2>&1; then
-        netstat -lnt 2>/dev/null | awk -v p=":${port} " '$4 ~ p {exit 0} END {exit 1}'
+        netstat -lnt 2>/dev/null | awk -v p=":${port}$" '$4 ~ p {found=1} END {exit !found}'
         return
     fi
     if command -v lsof >/dev/null 2>&1; then
@@ -313,24 +313,32 @@ check_config() {
         echo -e "${red}⚠ WARNING: No SSL certificate configured!${plain}"
         echo -e "${yellow}You can get a Let's Encrypt certificate for your IP address (valid ~6 days, auto-renews).${plain}"
         read -rp "Generate SSL certificate for IP now? [y/N]: " gen_ssl
-        if [[ "$gen_ssl" == "y" || "$gen_ssl" == "Y" ]]; then
-            stop >/dev/null 2>&1
-            ssl_cert_issue_for_ip
-            if [[ $? -eq 0 ]]; then
+        if [[ "${gen_ssl,,}" == "y" || "${gen_ssl,,}" == "yes" || "${gen_ssl,,}" == "-y" ]]; then
+            if issue_ip_ssl_from_settings; then
                 echo -e "${green}Access URL: https://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
-                # ssl_cert_issue_for_ip already restarts the panel, but ensure it's running
-                start >/dev/null 2>&1
             else
                 LOGE "IP certificate setup failed."
-                echo -e "${yellow}You can try again via option 19 (SSL Certificate Management).${plain}"
-                start >/dev/null 2>&1
+                echo -e "${yellow}You can try again via option 18 (SSL Certificate Management).${plain}"
             fi
         else
             echo -e "${yellow}Access URL: http://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
-            echo -e "${yellow}For security, please configure SSL certificate using option 19 (SSL Certificate Management)${plain}"
+            echo -e "${yellow}For security, please configure SSL certificate using option 18 (SSL Certificate Management)${plain}"
         fi
     fi
 }
+
+issue_ip_ssl_from_settings() (
+    # Run cleanup on success, failure, cancellation and interruption. Helpers
+    # receive an argument so they never open another (possibly hidden) menu.
+    local was_running=0
+    check_status
+    [[ $? -eq 0 ]] && was_running=1
+    trap 'if [[ "$was_running" == 1 ]]; then start 0; fi' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    if [[ "$was_running" == 1 ]]; then stop 0; fi
+    ssl_cert_issue_for_ip
+)
 
 set_port() {
     echo -n "Enter port number[1-65535]: "
@@ -996,8 +1004,7 @@ install_acme() {
     LOGI "Installing acme.sh..."
     cd ~ || return 1 # Ensure you can change to the home directory
 
-    curl -s https://get.acme.sh | sh
-    if [ $? -ne 0 ]; then
+    if ! (set -o pipefail; curl -fLsS --connect-timeout 15 --max-time 60 https://get.acme.sh | timeout --foreground 180 sh); then
         LOGE "Installation of acme.sh failed."
         return 1
     else
@@ -1154,41 +1161,41 @@ ssl_cert_issue_for_ip() {
     # check for acme.sh first
     if ! command -v ~/.acme.sh/acme.sh &>/dev/null; then
         LOGI "acme.sh not found, installing..."
-        install_acme
-        if [ $? -ne 0 ]; then
-            LOGE "Failed to install acme.sh"
-            return 1
-        fi
+        install_acme || return 1
     fi
     
-    # install socat
+    # Show dependency progress instead of silently waiting for the package manager.
+    if ! command -v socat >/dev/null 2>&1; then
+    LOGI "Installing the socat certificate dependency..."
     case "${release}" in
     ubuntu | debian | armbian)
-        apt-get update >/dev/null 2>&1 && apt-get install socat -y >/dev/null 2>&1
+        timeout --foreground 180 apt-get update && timeout --foreground 180 apt-get install socat -y || return 1
         ;;
     fedora | amzn | virtuozzo | rhel | almalinux | rocky | ol)
-        dnf -y update >/dev/null 2>&1 && dnf -y install socat >/dev/null 2>&1
+        timeout --foreground 180 dnf -y install socat || return 1
         ;;
     centos)
         if [[ "${VERSION_ID}" =~ ^7 ]]; then
-            yum -y update >/dev/null 2>&1 && yum -y install socat >/dev/null 2>&1
+            timeout --foreground 180 yum -y install socat || return 1
         else
-            dnf -y update >/dev/null 2>&1 && dnf -y install socat >/dev/null 2>&1
+            timeout --foreground 180 dnf -y install socat || return 1
         fi
         ;;
     arch | manjaro | parch)
-        pacman -Sy --noconfirm socat >/dev/null 2>&1
+        timeout --foreground 180 pacman -Sy --noconfirm socat || return 1
         ;;
     opensuse-tumbleweed | opensuse-leap)
-        zypper refresh >/dev/null 2>&1 && zypper -q install -y socat >/dev/null 2>&1
+        timeout --foreground 180 zypper -q install -y socat || return 1
         ;;
     alpine)
-        apk add socat curl openssl >/dev/null 2>&1
+        timeout --foreground 180 apk add socat curl openssl || return 1
         ;;
     *)
-        LOGW "Unsupported OS for automatic socat installation"
+        LOGE "Install socat before requesting an IP certificate on this OS."
+        return 1
         ;;
     esac
+    fi
     
     # Create certificate directory
     certPath="/root/cert/ip"
@@ -1241,8 +1248,9 @@ ssl_cert_issue_for_ip() {
     local reloadCmd="systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null"
     
     # issue the certificate for IP with shortlived profile
-    ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force
-    ~/.acme.sh/acme.sh --issue \
+    timeout --foreground 30 ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force || return 1
+    LOGI "Requesting the certificate (up to five minutes)..."
+    timeout --foreground 300 ~/.acme.sh/acme.sh --issue \
         ${domain_args} \
         --standalone \
         --server letsencrypt \
@@ -1254,10 +1262,6 @@ ssl_cert_issue_for_ip() {
     if [ $? -ne 0 ]; then
         LOGE "Failed to issue certificate for IP: ${server_ip}"
         LOGE "Make sure port ${WebPort} is open and the server is accessible from the internet"
-        # Cleanup acme.sh data for both IPv4 and IPv6 if specified
-        rm -rf ~/.acme.sh/${server_ip} 2>/dev/null
-        [[ -n "$ipv6_addr" ]] && rm -rf ~/.acme.sh/${ipv6_addr} 2>/dev/null
-        rm -rf ${certPath} 2>/dev/null
         return 1
     else
         LOGI "Certificate issued successfully for IP: ${server_ip}"
@@ -1266,7 +1270,7 @@ ssl_cert_issue_for_ip() {
     # Install the certificate
     # Note: acme.sh may report "Reload error" and exit non-zero if reloadcmd fails,
     # but the cert files are still installed. We check for files instead of exit code.
-    ~/.acme.sh/acme.sh --installcert -d ${server_ip} \
+    timeout --foreground 60 ~/.acme.sh/acme.sh --installcert -d ${server_ip} \
         --key-file "${certPath}/privkey.pem" \
         --fullchain-file "${certPath}/fullchain.pem" \
         --reloadcmd "${reloadCmd}" 2>&1 || true
@@ -1274,17 +1278,13 @@ ssl_cert_issue_for_ip() {
     # Verify certificate files exist (don't rely on exit code - reloadcmd failure causes non-zero)
     if [[ ! -f "${certPath}/fullchain.pem" || ! -f "${certPath}/privkey.pem" ]]; then
         LOGE "Certificate files not found after installation"
-        # Cleanup acme.sh data for both IPv4 and IPv6 if specified
-        rm -rf ~/.acme.sh/${server_ip} 2>/dev/null
-        [[ -n "$ipv6_addr" ]] && rm -rf ~/.acme.sh/${ipv6_addr} 2>/dev/null
-        rm -rf ${certPath} 2>/dev/null
         return 1
     fi
     
     LOGI "Certificate files installed successfully"
     
     # enable auto-renew
-    ~/.acme.sh/acme.sh --upgrade --auto-upgrade >/dev/null 2>&1
+    timeout --foreground 60 ~/.acme.sh/acme.sh --upgrade --auto-upgrade
     chmod 600 $certPath/privkey.pem 2>/dev/null
     chmod 644 $certPath/fullchain.pem 2>/dev/null
     
@@ -1300,7 +1300,7 @@ ssl_cert_issue_for_ip() {
         LOGI "  - Validity: ~6 days (auto-renews via acme.sh cron)"
         echo -e "${green}Access URL: https://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
         LOGI "Panel will restart to apply SSL certificate..."
-        restart
+        restart 0
         return 0
     else
         LOGE "Certificate files not found after installation"
@@ -2206,27 +2206,6 @@ show_usage() {
 └────────────────────────────────────────────────────────────────┘"
 }
 
-payload_proxy_menu() {
-    local resources="$xui_folder/resources"
-    if [[ ! -f "$resources/payload-proxy.sh" || ! -f "$resources/setup-payload-proxy.py" ]]; then
-        LOGE "Payload / Proxy resources are missing. Update x-ui to install the bundled manager."
-        before_show_menu
-        return
-    fi
-    if ! command -v python3 >/dev/null 2>&1; then
-        LOGE "Python 3 is required for Payload / Proxy."
-        before_show_menu
-        return
-    fi
-    if ! python3 "$resources/setup-payload-proxy.py" "$resources/payload-proxy.sh"; then
-        LOGE "Unable to prepare Payload / Proxy. Existing proxy settings were preserved."
-        before_show_menu
-        return
-    fi
-    bash /usr/local/bin/x-ui-proxy
-    before_show_menu
-}
-
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
@@ -2236,38 +2215,37 @@ show_menu() {
 │   ${green}1.${plain} Install                                   │
 │   ${green}2.${plain} Update                                    │
 │   ${green}3.${plain} Update Menu                               │
-│   ${green}4.${plain} Payload / Proxy                           │
-│   ${green}5.${plain} Uninstall                                 │
+│   ${green}4.${plain} Uninstall                                 │
 │────────────────────────────────────────────────│
-│   ${green}6.${plain} Reset Username & Password                 │
-│   ${green}7.${plain} Reset Web Base Path                       │
-│   ${green}8.${plain} Reset Settings                            │
-│   ${green}9.${plain} Change Port                               │
-│  ${green}10.${plain} View Current Settings                     │
+│   ${green}5.${plain} Reset Username & Password                 │
+│   ${green}6.${plain} Reset Web Base Path                       │
+│   ${green}7.${plain} Reset Settings                            │
+│   ${green}8.${plain} Change Port                               │
+│   ${green}9.${plain} View Current Settings                     │
 │────────────────────────────────────────────────│
-│  ${green}11.${plain} Start                                     │
-│  ${green}12.${plain} Stop                                      │
-│  ${green}13.${plain} Restart                                   │
-|  ${green}14.${plain} Restart Xray                              │
-│  ${green}15.${plain} Check Status                              │
-│  ${green}16.${plain} Logs Management                           │
+│  ${green}10.${plain} Start                                     │
+│  ${green}11.${plain} Stop                                      │
+│  ${green}12.${plain} Restart                                   │
+│  ${green}13.${plain} Restart Xray                              │
+│  ${green}14.${plain} Check Status                              │
+│  ${green}15.${plain} Logs Management                           │
 │────────────────────────────────────────────────│
-│  ${green}17.${plain} Enable Autostart                          │
-│  ${green}18.${plain} Disable Autostart                         │
+│  ${green}16.${plain} Enable Autostart                          │
+│  ${green}17.${plain} Disable Autostart                         │
 │────────────────────────────────────────────────│
-│  ${green}19.${plain} SSL Certificate Management                │
-│  ${green}20.${plain} Cloudflare SSL Certificate                │
-│  ${green}21.${plain} IP Limit Management                       │
-│  ${green}22.${plain} Firewall Management                       │
-│  ${green}23.${plain} SSH Port Forwarding Management            │
+│  ${green}18.${plain} SSL Certificate Management                │
+│  ${green}19.${plain} Cloudflare SSL Certificate                │
+│  ${green}20.${plain} IP Limit Management                       │
+│  ${green}21.${plain} Firewall Management                       │
+│  ${green}22.${plain} SSH Port Forwarding Management            │
 │────────────────────────────────────────────────│
-│  ${green}24.${plain} Enable BBR                                │
-│  ${green}25.${plain} Update Geo Files                          │
-│  ${green}26.${plain} Speedtest by Ookla                        │
+│  ${green}23.${plain} Enable BBR                                │
+│  ${green}24.${plain} Update Geo Files                          │
+│  ${green}25.${plain} Speedtest by Ookla                        │
 ╚────────────────────────────────────────────────╝
 "
     show_status
-    echo && read -rp "Please enter your selection [0-26]: " num
+    echo && read -rp "Please enter your selection [0-25]: " num
 
     case "${num}" in
     0)
@@ -2283,76 +2261,73 @@ show_menu() {
         check_install && update_menu
         ;;
     4)
-        check_install && payload_proxy_menu
-        ;;
-    5)
         check_install && uninstall
         ;;
-    6)
+    5)
         check_install && reset_user
         ;;
-    7)
+    6)
         check_install && reset_webbasepath
         ;;
-    8)
+    7)
         check_install && reset_config
         ;;
-    9)
+    8)
         check_install && set_port
         ;;
-    10)
+    9)
         check_install && check_config
         ;;
-    11)
+    10)
         check_install && start
         ;;
-    12)
+    11)
         check_install && stop
         ;;
-    13)
+    12)
         check_install && restart
         ;;
-    14)
+    13)
         check_install && restart_xray
         ;;
-    15)
+    14)
         check_install && status
         ;;
-    16)
+    15)
         check_install && show_log
         ;;
-    17)
+    16)
         check_install && enable
         ;;
-    18)
+    17)
         check_install && disable
         ;;
-    19)
+    18)
         ssl_cert_issue_main
         ;;
-    20)
+    19)
         ssl_cert_issue_CF
         ;;
-    21)
+    20)
         iplimit_main
         ;;
-    22)
+    21)
         firewall_menu
         ;;
-    23)
+    22)
         SSH_port_forwarding
         ;;
-    24)
+    23)
         bbr_menu
         ;;
-    25)
+    24)
         update_geo
         ;;
-    26)
+    25)
         run_speedtest
         ;;
     *)
-        LOGE "Please enter the correct number [0-26]"
+        LOGE "Please enter the correct number [0-25]"
         ;;
     esac
 }

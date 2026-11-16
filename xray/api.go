@@ -101,10 +101,23 @@ func (x *XrayAPI) Close() {
 
 // AddInbound adds a new inbound configuration to the Xray core via gRPC.
 func (x *XrayAPI) AddInbound(inbound []byte) error {
+	var raw struct {
+		StreamSettings json.RawMessage `json:"streamSettings"`
+	}
+	if err := json.Unmarshal(inbound, &raw); err != nil {
+		return err
+	}
+	payload, err := InjectPayloadEnabled(raw.StreamSettings)
+	if err != nil {
+		return err
+	}
+	if payload && !NativePayloadAvailable() {
+		return fmt.Errorf("the Accept Payloads option requires the bundled TDZ Payload/3 core")
+	}
 	client := *x.HandlerServiceClient
 
 	conf := new(conf.InboundDetourConfig)
-	err := json.Unmarshal(inbound, conf)
+	err = json.Unmarshal(inbound, conf)
 	if err != nil {
 		logger.Debug("Failed to unmarshal inbound:", err)
 		return err
@@ -112,6 +125,9 @@ func (x *XrayAPI) AddInbound(inbound []byte) error {
 	config, err := conf.Build()
 	if err != nil {
 		logger.Debug("Failed to build inbound Detur:", err)
+		return err
+	}
+	if err := applyPayloadToAPI(config, payload); err != nil {
 		return err
 	}
 	inboundConfig := command.AddInboundRequest{Inbound: config}

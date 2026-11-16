@@ -27,6 +27,7 @@ type ResellerAccessForm struct {
 	Username        string `json:"username" form:"username"`
 	Password        string `json:"password" form:"password"`
 	CanEditInbounds bool   `json:"canEditInbounds" form:"canEditInbounds"`
+	CanEditPassword bool   `json:"canEditPassword" form:"canEditPassword"`
 	InboundIDs      []int  `json:"inboundIds" form:"inboundIds"`
 }
 
@@ -43,7 +44,7 @@ func ValidResellerPath(path string) bool {
 		return false
 	}
 	switch strings.ToLower(path) {
-	case "panel", "assets", "login", "logout", "ws", "xui", "api", "gettwofactorenable", "favicon", "robots":
+	case "reseller", "panel", "assets", "login", "logout", "ws", "xui", "api", "gettwofactorenable", "favicon", "robots":
 		return false
 	}
 	return true
@@ -178,6 +179,7 @@ func (s *ResellerService) Save(adminID, id int, form ResellerAccessForm) (*model
 	}
 	account.Enabled, account.Path, account.Username = form.Enabled, form.Path, form.Username
 	account.CanEditInbounds = form.CanEditInbounds
+	account.CanEditPassword = form.CanEditPassword
 	if changed || account.Version == "" {
 		account.Version = uuid.NewString()
 	}
@@ -212,6 +214,40 @@ func (s *ResellerService) Delete(adminID, id int) error {
 			return err
 		}
 		return tx.Delete(&model.ResellerAccount{}, id).Error
+	})
+}
+
+var ErrResellerPasswordPermission = errors.New("password editing is disabled for your account")
+var ErrResellerSessionRevoked = errors.New("please log in again")
+
+// Re-read permissions and version under the same write lock as admin changes.
+// Updating the password and audit atomically revokes every existing session.
+func (s *ResellerService) ChangeOwnPassword(principal *model.ResellerAccount, current, password, ip string) error {
+	ResellerAccessMu.Lock()
+	defer ResellerAccessMu.Unlock()
+	var account model.ResellerAccount
+	if principal == nil || database.GetDB().Where("id = ? AND path = ? AND version = ? AND enabled = ?", principal.ID, principal.Path, principal.Version, true).First(&account).Error != nil {
+		return ErrResellerSessionRevoked
+	}
+	if !account.CanEditPassword {
+		return ErrResellerPasswordPermission
+	}
+	if password == "" {
+		return errors.New("new password is required")
+	}
+	if !CheckResellerPassword(account.PasswordHash, current) {
+		return errors.New("current password is incorrect")
+	}
+	hash, err := hashResellerPassword(password)
+	if err != nil {
+		return err
+	}
+	account.PasswordHash, account.Version = hash, uuid.NewString()
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&account).Error; err != nil {
+			return err
+		}
+		return tx.Create(&model.ResellerAudit{ResellerID: account.ID, Username: account.Username, Action: "account.password", IP: ip}).Error
 	})
 }
 

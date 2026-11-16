@@ -32,6 +32,7 @@ if [[ ! -f "$source_dir/app/dispatcher/tdz_ip_limit.go" ]]; then
     "$python_cmd" "$root/xray-patches/apply.py" "$source_dir"
 fi
 "$python_cmd" "$root/xray-patches/apply_client_addr.py" "$source_dir"
+"$python_cmd" "$root/xray-patches/apply_payload.py" "$source_dir"
 cp "$root/xray-patches/testdata/tdz_ip_limit.go" "$source_dir/app/dispatcher/tdz_ip_limit.go"
 cp "$root/xray-patches/testdata/tdz_ip_limit_test.go" "$source_dir/app/dispatcher/tdz_ip_limit_test.go"
 cp "$root/xray-patches/testdata/tdz_session.go" "$source_dir/common/session/tdz_session.go"
@@ -39,5 +40,5 @@ mkdir -p "$(dirname "$destination")"
 export CGO_ENABLED=0
 (
     cd "$source_dir"
-    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2' -o "$destination" ./main
+    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2+Payload/3' -o "$destination" ./main
 )

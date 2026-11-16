@@ -818,8 +818,12 @@ func cloneStringMap(source map[string]string) map[string]string {
 }
 
 func (s *SubService) genRemark(inbound *model.Inbound, email string, extra string) string {
-	separationChar := string(s.remarkModel[0])
-	orderChars := s.remarkModel[1:]
+	pattern := s.remarkModel
+	if len(pattern) < 2 {
+		pattern = "-eo"
+	}
+	separationChar := string(pattern[0])
+	orderChars := pattern[1:]
 	orders := map[byte]string{
 		'i': "",
 		'e': "",
@@ -827,9 +831,6 @@ func (s *SubService) genRemark(inbound *model.Inbound, email string, extra strin
 	}
 	if len(email) > 0 {
 		orders['e'] = email
-	}
-	if len(inbound.Remark) > 0 {
-		orders['i'] = inbound.Remark
 	}
 	if len(extra) > 0 {
 		orders['o'] = extra
@@ -842,6 +843,9 @@ func (s *SubService) genRemark(inbound *model.Inbound, email string, extra strin
 		if exists && order != "" {
 			remark = append(remark, order)
 		}
+	}
+	if len(remark) == 0 && email != "" {
+		remark = append(remark, email)
 	}
 
 	if s.showInfo {

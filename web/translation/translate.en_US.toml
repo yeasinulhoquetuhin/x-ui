@@ -89,6 +89,7 @@
 "noExpiry" = "No expiry"
 
 [menu]
+"reseller" = "Resellers"
 "theme" = "Theme"
 "dark" = "Dark"
 "ultraDark" = "Ultra Dark"

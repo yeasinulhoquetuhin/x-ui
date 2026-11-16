@@ -45,7 +45,7 @@ func (a *XUIController) inbounds(c *gin.Context) {
 }
 
 func (a *XUIController) resellers(c *gin.Context) {
-	html(c, "resellers.html", "Reseller", nil)
+	html(c, "resellers.html", "menu.reseller", nil)
 }
 
 // settings renders the settings management page.

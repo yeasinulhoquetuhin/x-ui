@@ -124,7 +124,7 @@
       user: {},
       lang: LanguageManager.getLanguage(),
       inboundOptions: [],
-      remarkModels: { i: 'Inbound', e: 'Email', o: 'Other' },
+      remarkModels: { e: 'Email', o: 'Other' },
       remarkSeparators: [' ', '-', '_', '@', ':', '~', '|', ',', '.', '/'],
       datepickerList: [{ name: 'Gregorian (Standard)', value: 'gregorian' }, { name: 'Jalalian (شمسی)', value: 'jalalian' }],
       remarkSample: '',
@@ -183,7 +183,7 @@
       ],
       get remarkModel() {
         rm = this.allSetting.remarkModel;
-        return rm.length > 1 ? rm.substring(1).split('') : [];
+        return rm.length > 1 ? rm.substring(1).split('').filter(char => char !== 'i') : [];
       },
       set remarkModel(value) {
         rs = this.allSetting.remarkModel[0];

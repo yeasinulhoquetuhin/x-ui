@@ -6,7 +6,7 @@
             <a-theme-switch></a-theme-switch>
             <a-menu :theme="themeSwitcher.currentTheme" mode="inline" :selected-keys="activeTab"
                 @click="({key}) => openLink(key)">
-                <a-menu-item v-for="tab in tabs" :key="tab.key">
+                <a-menu-item v-for="tab in visibleTabs" :key="tab.key">
                     <a-icon :type="tab.icon"></a-icon>
                     <span v-text="tab.title"></span>
                 </a-menu-item>
@@ -20,12 +20,22 @@
             <a-theme-switch></a-theme-switch>
             <a-menu :theme="themeSwitcher.currentTheme" mode="inline" :selected-keys="activeTab"
                 @click="({key}) => openLink(key)">
-                <a-menu-item v-for="tab in tabs" :key="tab.key">
+                <a-menu-item v-for="tab in visibleTabs" :key="tab.key">
                     <a-icon :type="tab.icon"></a-icon>
                     <span v-text="tab.title"></span>
                 </a-menu-item>
             </a-menu>
         </a-drawer>
+        {{if .is_reseller}}
+        <a-modal :visible="passwordVisible" @cancel="closePassword" @ok="savePassword" :confirm-loading="passwordSaving" :mask-closable="false" :class="themeSwitcher.currentTheme" title="Change Password" ok-text="Update password">
+            <p>You will sign in again after changing your password.</p>
+            <a-form layout="vertical">
+                <a-form-item label="Current password"><a-input-password v-model="currentPassword" autocomplete="current-password"></a-input-password></a-form-item>
+                <a-form-item label="New password"><a-input-password v-model="newPassword" autocomplete="new-password"></a-input-password></a-form-item>
+                <a-form-item label="Confirm new password"><a-input-password v-model="confirmPassword" autocomplete="new-password" @pressEnter="savePassword"></a-input-password></a-form-item>
+            </a-form>
+        </a-modal>
+        {{end}}
     </div>
 </template>
 {{end}}
@@ -41,6 +51,7 @@
     const SIDEBAR_COLLAPSED_KEY = "isSidebarCollapsed"
 
     Vue.component('a-sidebar', {
+        props: {canEditPassword: {type:Boolean, default:false}},
         data() {
             return {
                 tabs: [
@@ -50,6 +61,7 @@
                         icon: 'dashboard',
                         title: 'Reseller Dashboard'
                     },
+                    {key: 'reseller-password', icon:'lock', title:'Change Password'},
                     {{else}}
                     {
                         key: '{{ .base_path }}panel/',
@@ -88,13 +100,26 @@
                 ],
                 visible: false,
                 collapsed: JSON.parse(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)),
+                passwordVisible:false, passwordSaving:false,
+                currentPassword:'', newPassword:'', confirmPassword:'',
             }
         },
+        computed: {visibleTabs(){return this.tabs.filter(tab=>tab.key!=='reseller-password'||this.canEditPassword);}},
+        watch: {canEditPassword(value){if(!value)this.closePassword();}},
         methods: {
             openLink(key) {
+                if(key==='reseller-password'){this.visible=false;this.passwordVisible=true;return;}
                 return key.startsWith('http') ? 
                     window.open(key) : 
                     location.href = key
+            },
+            closePassword(){this.passwordVisible=false;this.currentPassword='';this.newPassword='';this.confirmPassword='';},
+            async savePassword(){
+                if(!this.canEditPassword||this.passwordSaving)return;
+                if(!this.currentPassword||!this.newPassword||this.newPassword!==this.confirmPassword){this.$message.error('Enter your current password and matching new passwords.');return;}
+                this.passwordSaving=true;
+                try{const response=await HttpUtil.post('/panel/api/account/password',{currentPassword:this.currentPassword,newPassword:this.newPassword,confirmPassword:this.confirmPassword});if(response.success){this.closePassword();location.assign(basePath);}}
+                finally{this.passwordSaving=false;}
             },
             closeDrawer() {
                 this.visible = false;
@@ -110,7 +135,7 @@
                 }
             }
         },
-        template: `{{template "component/sidebar/content"}}`,
+        template: `{{template "component/sidebar/content" .}}`,
     });
 </script>
 {{end}}

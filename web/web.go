@@ -253,6 +253,9 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		// Use the registered func map with the loaded templates
 		engine.LoadHTMLFiles(files...)
 		engine.StaticFS(basePath+"assets", http.FS(os.DirFS("web/assets")))
+		if basePath != "/reseller/" {
+			engine.StaticFS("/reseller/assets", http.FS(os.DirFS("web/assets")))
+		}
 	} else {
 		// for production
 		template, err := s.getHtmlTemplate(funcMap)
@@ -261,6 +264,9 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		}
 		engine.SetHTMLTemplate(template)
 		engine.StaticFS(basePath+"assets", http.FS(&wrapAssetsFS{FS: assetsFS}))
+		if basePath != "/reseller/" {
+			engine.StaticFS("/reseller/assets", http.FS(&wrapAssetsFS{FS: assetsFS}))
+		}
 	}
 
 	// Apply the redirect middleware (`/xui` to `/panel`)
@@ -268,7 +274,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 	g := engine.Group(basePath)
 
-	controller.NewResellerController(g, secret)
+	controller.NewResellerController(engine.Group("/reseller"), secret)
 
 	s.index = controller.NewIndexController(g)
 	s.panel = controller.NewXUIController(g)

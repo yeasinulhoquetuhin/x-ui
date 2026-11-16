@@ -11,7 +11,7 @@ class AllSetting {
         this.pageSize = 25;
         this.expireDiff = 0;
         this.trafficDiff = 0;
-        this.remarkModel = "-ieo";
+        this.remarkModel = "-eo";
         this.datepicker = "gregorian";
         this.tgBotEnable = false;
         this.tgBotToken = "";

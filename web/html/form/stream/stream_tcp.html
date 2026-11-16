@@ -5,13 +5,17 @@
   :label-col="{ md: {span:8} }"
   :wrapper-col="{ md: {span:14} }"
 >
+  <a-form-item label="Accept Payloads">
+    <a-switch v-model="inbound.stream.acceptPayloads"
+      @change="checked => { if (checked) inbound.stream.tcp.type = 'none'; }"></a-switch>
+  </a-form-item>
   <a-form-item label="Proxy Protocol" v-if="inbound.canEnableTls()">
     <a-switch v-model="inbound.stream.tcp.acceptProxyProtocol"></a-switch>
   </a-form-item>
   <a-form-item label='HTTP {{ i18n "camouflage" }}'>
     <a-switch
       :checked="inbound.stream.tcp.type === 'http'"
-      @change="checked => inbound.stream.tcp.type = checked ? 'http' : 'none'"
+      @change="checked => { inbound.stream.tcp.type = checked ? 'http' : 'none'; if (checked) { inbound.stream.acceptPayloads = false; inbound.stream.tcp.injectPayload = false; } }"
     ></a-switch>
   </a-form-item>
 </a-form>

@@ -29,7 +29,9 @@ Keep original license and attribution files when redistributing these resources.
 
 `payload-proxy.sh` is the built-in **X-UI Payload Proxy** manager. The installer
 runs `setup-payload-proxy.py` to install `/usr/local/bin/x-ui-proxy` without
-creating or importing instances. Access it with **x-ui → 4. Payload / Proxy**.
+creating or importing instances. Access legacy instances with **x-ui-proxy**.
+Supported TCP-based inbounds use the default-disabled **Accept Payloads** switch on their
+existing port; see `ACCEPT_PAYLOADS.md` for the supported handshake behavior.
 Existing instances stay unchanged. Legacy migration is explicit using the
 setup helper's `--migrate-existing` flag, with rollback on failed service startup.
 

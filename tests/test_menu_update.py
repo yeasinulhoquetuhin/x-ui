@@ -35,9 +35,11 @@ update_menu() {''' + function + '\nupdate_menu\n'
             self.assertEqual((app / 'x-ui.sh').read_bytes(), menu.read_bytes())
             self.assertEqual(panel.read_text(), 'existing panel binary')
 
-    def test_payload_manager_replaces_legacy_entry(self):
+    def test_payload_menu_removed_and_renumbered(self):
         source = (ROOT / 'x-ui.sh').read_text()
         menu = source.split('show_menu() {', 1)[1]
-        self.assertIn('${green}4.${plain} Payload / Proxy', menu)
-        self.assertNotIn('${green}27.', menu)
+        self.assertNotIn('Payload / Proxy', menu)
+        self.assertIn('${green}4.${plain} Uninstall', menu)
+        self.assertIn('${green}25.${plain} Speedtest by Ookla', menu)
+        self.assertNotIn('${green}26.', menu)
         self.assertNotIn('${green}4.${plain} Legacy Version', menu)

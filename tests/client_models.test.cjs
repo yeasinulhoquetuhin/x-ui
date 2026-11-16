@@ -5,9 +5,45 @@ const vm = require('node:vm');
 const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const context = vm.createContext({
-  RandomUtil: { randomLowerAndNum: () => 'random', randomUUID: () => 'uuid', randomSeq: () => 'secret', randomShadowsocksPassword: () => 'password' },
+  RandomUtil: { randomLowerAndNum: () => 'random', randomUUID: () => 'uuid', randomSeq: () => 'secret', randomShadowsocksPassword: () => 'password', randomShortIds:()=>['abcd'] },
 });
 vm.runInContext(fs.readFileSync(path.join(root, 'web/assets/js/model/inbound.js'), 'utf8') + '\nthis.Inbound = Inbound;', context);
+
+test('payload defaults off and survives an inbound JSON roundtrip', () => {
+  vm.runInContext('this.TCP = TcpStreamSettings;', context);
+  assert.equal(context.TCP.fromJson().toJson().injectPayload, false);
+  assert.equal(context.TCP.fromJson({injectPayload:true,header:{type:'none'}}).toJson().injectPayload, true);
+});
+
+test('Accept Payloads persists when switching supported transports and reopening', () => {
+  context.ObjectUtil = {isEmpty:value=>!value,isArrEmpty:value=>!value?.length,clone:value=>JSON.parse(JSON.stringify(value))};
+  vm.runInContext('this.Stream = StreamSettings;', context);
+  let stream = context.Stream.fromJson({network:'tcp',tcpSettings:{injectPayload:true}});
+  assert.equal(stream.acceptPayloads,true);
+  for (const enabled of [true,false]) {
+    stream.acceptPayloads=enabled;
+    for (const transport of ['ws','httpupgrade','grpc','xhttp','tcp','ws']) {
+      stream.network=transport;
+      const saved=JSON.parse(JSON.stringify(stream.toJson()));
+      assert.equal(saved.acceptPayloads,enabled);
+      stream=context.Stream.fromJson(saved);
+      assert.equal(stream.acceptPayloads,enabled);
+    }
+  }
+});
+
+test('copied links omit the inbound prefix with legacy remark settings', () => {
+  context.ObjectUtil = {isEmpty:value=>!value,isArrEmpty:value=>!value?.length};
+  context.location = {hostname:'example.test'};
+  const inbound = Object.create(context.Inbound.prototype);
+  inbound.listen=''; inbound.port=443; inbound.stream={externalProxy:[]};
+  inbound.genLink=(_a,_p,_t,label)=>'link#'+label;
+  for (const pattern of ['-ieo','-i','-eo']) {
+    assert.equal(inbound.genAllLinks('PRIVATE-INBOUND',pattern,{email:'client-name'})[0].remark,'client-name');
+  }
+  inbound.stream.externalProxy=[{remark:'extra',dest:'example.test',port:443,forceTls:'same'}];
+  assert.equal(inbound.genAllLinks('PRIVATE-INBOUND','-ieo',{email:'client-name'})[0].remark,'client-name-extra');
+});
 
 for (const [settings, name] of [['VmessSettings', 'VMESS'], ['VLESSSettings', 'VLESS'], ['TrojanSettings', 'Trojan'], ['ShadowsocksSettings', 'Shadowsocks'], ['HysteriaSettings', 'Hysteria']]) {
   test(`${settings} preserves automatic traffic-reset settings`, () => {

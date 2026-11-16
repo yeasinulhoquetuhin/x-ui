@@ -22,6 +22,7 @@ func TestNativeIPLimitTransports(t *testing.T) {
 	if binary == "" {
 		t.Skip("set TDZ_TEST_XRAY to run real-core integration tests")
 	}
+	nativePayload := os.Getenv("TDZ_TEST_NATIVE_PAYLOAD") == "1"
 	for _, tc := range []struct {
 		protocol, network string
 		mux               bool
@@ -33,6 +34,9 @@ func TestNativeIPLimitTransports(t *testing.T) {
 		{"trojan", "tcp", false, false}, {"shadowsocks", "tcp", false, false},
 		{"vless", "ws", false, true}, {"vless", "ws", true, true}, {"vless", "tcp", false, true},
 	} {
+		if nativePayload && tc.network == "kcp" {
+			continue
+		}
 		t.Run(tc.protocol+"/"+tc.network+"/mux="+strconv.FormatBool(tc.mux)+"/proxy="+strconv.FormatBool(tc.proxy), func(t *testing.T) {
 			dir := t.TempDir()
 			port := func() int {
@@ -81,13 +85,17 @@ func TestNativeIPLimitTransports(t *testing.T) {
 			if tc.protocol == "shadowsocks" {
 				serverSettings = map[string]any{"method": "chacha20-ietf-poly1305", "password": "test-password", "email": "limited", "network": "tcp,udp"}
 			}
+			serverStream := stream()
+			if nativePayload {
+				serverStream["acceptPayloads"] = true
+			}
 			server := map[string]any{
 				"log":   map[string]any{"loglevel": "debug", "access": "none"},
 				"api":   map[string]any{"tag": "api", "services": []string{"StatsService"}},
 				"stats": map[string]any{}, "policy": map[string]any{"levels": map[string]any{"0": map[string]any{"statsUserOnline": true}}},
 				"inbounds": []any{
 					map[string]any{"tag": "api", "listen": "127.0.0.1", "port": apiPort, "protocol": "tunnel", "settings": map[string]any{"address": "127.0.0.1"}},
-					map[string]any{"tag": "test", "listen": "127.0.0.1", "port": serverPort, "protocol": tc.protocol, "settings": serverSettings, "streamSettings": stream()},
+					map[string]any{"tag": "test", "listen": "127.0.0.1", "port": serverPort, "protocol": tc.protocol, "settings": serverSettings, "streamSettings": serverStream},
 				}, "outbounds": []any{map[string]any{"protocol": "freedom", "tag": "direct", "settings": map[string]any{"ipsBlocked": []string{}}}},
 				"routing": map[string]any{"rules": []any{map[string]any{"type": "field", "inboundTag": []string{"api"}, "outboundTag": "api"}}},
 			}
@@ -125,7 +133,7 @@ func TestNativeIPLimitTransports(t *testing.T) {
 			_ = os.WriteFile(limits, []byte(`{"limited":1}`), 0600)
 			start("server", server, limits)
 			endpointPort := serverPort
-			if tc.proxy {
+			if tc.proxy || nativePayload {
 				endpointPort = startTDZPayloadTestProxy(t, dir, serverPort)
 			}
 			for i, socks := range []int{socks1, socks2} {
@@ -270,6 +278,9 @@ func binarypkgPutPort(buf []byte, port int) { binary.BigEndian.PutUint16(buf, ui
 
 func startTDZPayloadTestProxy(t *testing.T, dir string, backend int) int {
 	t.Helper()
+	if os.Getenv("TDZ_TEST_NATIVE_PAYLOAD") == "1" {
+		return startTDZPayloadClientGate(t, backend)
+	}
 	proxy := os.Getenv("TDZ_TEST_PROXY")
 	if proxy == "" {
 		t.Skip("set TDZ_TEST_PROXY to the patched TDZP script for payload integration")
@@ -307,6 +318,13 @@ func startTDZPayloadTestProxy(t *testing.T, dir string, backend int) int {
 			t.Logf("proxy: %s", body)
 		}
 	})
+	return startTDZPayloadClientGate(t, public)
+}
+
+// Adds a client-side HTTP preface to a normal Xray client; source addresses are
+// retained so both admission and MUX slot lifetimes exercise the real socket.
+func startTDZPayloadClientGate(t *testing.T, public int) int {
+	t.Helper()
 	gate, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

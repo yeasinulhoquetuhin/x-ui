@@ -4,13 +4,13 @@
 {{ template "page/body_start" .}}
 <a-layout id="app" v-cloak
   :class="themeSwitcher.currentTheme + ' inbounds-page'">
-  <a-sidebar></a-sidebar>
+  <a-sidebar :can-edit-password="canEditPassword"></a-sidebar>
   <a-layout id="content-layout">
     <a-layout-content>
       <a-spin :spinning="loadingStates.spinning" :delay="500"
         tip='{{ i18n "loading"}}' size="large">
         <transition name="list" appear>
-          <a-alert type="error" v-if="showAlert && loadingStates.fetched"
+          <a-alert type="error" v-if="!isReseller && showAlert && loadingStates.fetched"
             :style="{ marginBottom: '10px' }"
             message='{{ i18n "secAlertTitle" }}' color="red"
             description='{{ i18n "secAlertSsl" }}' show-icon closable>
@@ -1098,6 +1098,7 @@
       themeSwitcher,
       isReseller: {{if .is_reseller}}true{{else}}false{{end}},
       canEditInbounds: {{if .is_reseller}}false{{else}}true{{end}},
+      canEditPassword: false,
       persianDatepicker,
       loadingStates: {
         fetched: false,
@@ -1187,7 +1188,10 @@
         this.remarkModel = settings.remarkModel;
         this.datepicker = settings.datepicker;
         this.ipLimitEnable = settings.ipLimitEnable;
-        if (this.isReseller) this.canEditInbounds = !!settings.canEditInbounds;
+        if (this.isReseller) {
+          this.canEditInbounds = !!settings.canEditInbounds;
+          this.canEditPassword = !!settings.canEditPassword;
+        }
       },
       setInbounds(dbInbounds) {
         this.inbounds.splice(0);
@@ -2053,6 +2057,7 @@
         if (this.isReseller) {
           window.wsClient.on('resellerAccess', payload => {
             this.canEditInbounds = !!payload?.canEditInbounds;
+            this.canEditPassword = !!payload?.canEditPassword;
             if (!this.canEditInbounds && inModal.visible) inModal.close();
           });
         }

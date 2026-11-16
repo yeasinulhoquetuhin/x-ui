@@ -194,12 +194,14 @@ class TcpStreamSettings extends XrayCommonClass {
         type = 'none',
         request = new TcpStreamSettings.TcpRequest(),
         response = new TcpStreamSettings.TcpResponse(),
+        injectPayload = false,
     ) {
         super();
         this.acceptProxyProtocol = acceptProxyProtocol;
         this.type = type;
         this.request = request;
         this.response = response;
+        this.injectPayload = injectPayload;
     }
 
     static fromJson(json = {}) {
@@ -211,12 +213,14 @@ class TcpStreamSettings extends XrayCommonClass {
             header.type,
             TcpStreamSettings.TcpRequest.fromJson(header.request),
             TcpStreamSettings.TcpResponse.fromJson(header.response),
+            json.injectPayload,
         );
     }
 
     toJson() {
         return {
             acceptProxyProtocol: this.acceptProxyProtocol,
+            injectPayload: this.injectPayload,
             header: {
                 type: this.type,
                 request: this.type === 'http' ? this.request.toJson() : undefined,
@@ -1338,6 +1342,7 @@ class StreamSettings extends XrayCommonClass {
         hysteriaSettings = new HysteriaStreamSettings(),
         finalmask = new FinalMaskStreamSettings(),
         sockopt = undefined,
+        acceptPayloads = false,
     ) {
         super();
         this.network = network;
@@ -1354,6 +1359,7 @@ class StreamSettings extends XrayCommonClass {
         this.hysteria = hysteriaSettings;
         this.finalmask = finalmask;
         this.sockopt = sockopt;
+        this.acceptPayloads = acceptPayloads;
     }
 
     addTcpMask(type = 'fragment') {
@@ -1432,6 +1438,7 @@ class StreamSettings extends XrayCommonClass {
             HysteriaStreamSettings.fromJson(json.hysteriaSettings),
             FinalMaskStreamSettings.fromJson(json.finalmask),
             SockoptStreamSettings.fromJson(json.sockopt),
+            json.acceptPayloads ?? json.tcpSettings?.injectPayload ?? json.rawSettings?.injectPayload ?? false,
         );
     }
 
@@ -1439,6 +1446,7 @@ class StreamSettings extends XrayCommonClass {
         const network = this.network;
         return {
             network: network,
+            acceptPayloads: ['tcp','raw','ws','websocket','grpc','httpupgrade','xhttp','splithttp'].includes(network) ? this.acceptPayloads : undefined,
             security: this.security,
             externalProxy: this.externalProxy,
             tlsSettings: this.isTls ? this.tls.toJson() : undefined,
@@ -2227,7 +2235,7 @@ class Inbound extends XrayCommonClass {
         const separationChar = remarkModel.charAt(0);
         let links = [];
         this.settings.peers.forEach((p, index) => {
-            links.push(this.getWireguardLink(addr, this.port, remark + separationChar + (index + 1), index));
+            links.push(this.getWireguardLink(addr, this.port, 'Peer' + separationChar + (index + 1), index));
         });
         return links.join('\r\n');
     }
@@ -2237,7 +2245,7 @@ class Inbound extends XrayCommonClass {
         const separationChar = remarkModel.charAt(0);
         let links = [];
         this.settings.peers.forEach((p, index) => {
-            links.push(this.getWireguardTxt(addr, this.port, remark + separationChar + (index + 1), index));
+            links.push(this.getWireguardTxt(addr, this.port, 'Peer' + separationChar + (index + 1), index));
         });
         return links.join('\r\n');
     }
@@ -2266,12 +2274,12 @@ class Inbound extends XrayCommonClass {
         const separationChar = remarkModel.charAt(0);
         const orderChars = remarkModel.slice(1);
         let orders = {
-            'i': remark,
+            'i': '',
             'e': email,
             'o': '',
         };
         if (ObjectUtil.isArrEmpty(this.stream.externalProxy)) {
-            let r = orderChars.split('').map(char => orders[char]).filter(x => x.length > 0).join(separationChar);
+            let r = orderChars.split('').map(char => orders[char] || '').filter(x => x.length > 0).join(separationChar) || email;
             result.push({
                 remark: r,
                 link: this.genLink(addr, port, 'same', r, client)
@@ -2279,7 +2287,7 @@ class Inbound extends XrayCommonClass {
         } else {
             this.stream.externalProxy.forEach((ep) => {
                 orders['o'] = ep.remark;
-                let r = orderChars.split('').map(char => orders[char]).filter(x => x.length > 0).join(separationChar);
+                let r = orderChars.split('').map(char => orders[char] || '').filter(x => x.length > 0).join(separationChar) || email;
                 result.push({
                     remark: r,
                     link: this.genLink(ep.dest, ep.port, ep.forceTls, r, client)
@@ -2300,7 +2308,7 @@ class Inbound extends XrayCommonClass {
             });
             return links.join('\r\n');
         } else {
-            if (this.protocol == Protocols.SHADOWSOCKS && !this.isSSMultiUser) return this.genSSLink(addr, this.port, 'same', remark);
+            if (this.protocol == Protocols.SHADOWSOCKS && !this.isSSMultiUser) return this.genSSLink(addr, this.port, 'same', 'Shadowsocks');
             if (this.protocol == Protocols.WIREGUARD) {
                 return this.genWireguardConfigs(remark, remarkModel);
             }

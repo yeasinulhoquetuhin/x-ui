@@ -56,6 +56,13 @@ func NativeIPLimitAvailable() bool {
 	return err == nil && bytes.Contains(output, []byte("TDZ-IPLimit/2"))
 }
 
+func NativePayloadAvailable() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, GetBinaryPath(), "-version").Output()
+	return err == nil && bytes.Contains(output, []byte("Payload/3"))
+}
+
 // GetGeositePath returns the path to the geosite data file used by Xray.
 func GetGeositePath() string {
 	return config.GetBinFolderPath() + "/geosite.dat"

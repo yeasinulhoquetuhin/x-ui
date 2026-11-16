@@ -200,6 +200,9 @@
         },
         methods: {
             streamNetworkChange() {
+                if (inModal.inbound.stream.acceptPayloads && inModal.inbound.stream.network === 'tcp') {
+                    inModal.inbound.stream.tcp.type = 'none';
+                }
                 if (!inModal.inbound.canEnableTls()) {
                     this.inModal.inbound.stream.security = "none";
                 }

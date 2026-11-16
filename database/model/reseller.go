@@ -17,6 +17,7 @@ type ResellerAccount struct {
 	AdminID         int    `json:"-" gorm:"index;not null"`
 	Enabled         bool   `json:"enabled"`
 	CanEditInbounds bool   `json:"canEditInbounds" gorm:"default:false"`
+	CanEditPassword bool   `json:"canEditPassword" gorm:"default:false"`
 	Path            string `json:"path" gorm:"uniqueIndex;not null"`
 	Username        string `json:"username"`
 	PasswordHash    string `json:"-"`

@@ -1,38 +1,47 @@
-# TDZ X-UI v2.9.3-patched.3
+# TDZ X-UI v2.9.3-patched.4
 
-## Independent reseller accounts
+V4 brings the original TDZ payload handshake into the inbound's own listener, improves administrator reseller management, and adds controlled reseller password changes.
 
-- Manage accounts from **Reseller** in the administrator sidebar, below Inbounds and above Xray Configs. Create, edit, enable/disable, delete, copy login URLs and inspect account activity from one page.
-- Assign any number of inbounds through a searchable multi-select. Multiple resellers can share an inbound and its client list/usage.
-- Enabled accounts with no assignments can log in and see **Total Inbounds: 0** and **No inbounds assigned yet.** Assignments and counts update in open dashboards.
-- **Allow Inbound Editing** defaults to off. Enable it per account to allow configuration edits and inbound enable/disable for every assigned inbound. Inbound creation/deletion and panel/server administration remain admin-only.
-- Shared inbound configuration edits preserve the latest clients and traffic counters. Permission and assignment changes are checked server-side and reflected in scoped live updates.
+## Accept Payloads on one port
 
-## V2 migration
+- Default-disabled **Accept Payloads** switch above Proxy Protocol; its value survives supported transport changes, save and reopen.
+- Available for TCP/RAW, WebSocket, HTTPUpgrade, gRPC and XHTTP over TCP (HTTP/1.1 and HTTP/2).
+- Matches the original TDZ proxy: consume exactly one header ending in CRLFCRLF, send the fixed `101 Switching Protocols` response, then forward all remaining bytes unchanged. GET, POST, CONNECT and custom header contents use the same response.
+- The payload comes before the native transport/TLS handshake. **ON requires an initial payload**; OFF uses ordinary inbound behavior. No extra backend TCP port is allocated.
+- Original source IP, authentication, routing and IP limits remain integrated with Xray. Live API updates retain the payload setting.
+- Bundled core marker: `TDZ-IPLimit/2+Payload/3`, based on Xray 26.4.25. UDP/KCP/Hysteria/QUIC do not use this TCP payload option.
 
-Existing per-inbound reseller accounts migrate automatically, preserving their URL path, username, password hash, authentication version and activity. Their original inbound becomes an assignment and inbound editing defaults to off. Migration is idempotent: removed assignments/deleted accounts are not recreated on restart. Removing an inbound keeps its reseller accounts available.
+See [ACCEPT_PAYLOADS.md](ACCEPT_PAYLOADS.md) for the exact response, limits and client handshake order.
 
-Credentials and account enable/disable changes revoke existing HTTP/WebSocket sessions. Assignment and editing-permission changes apply without a new login. Activity is recorded by reseller account with the affected inbound ID.
+## Reseller management
 
-## Features retained
+- The administrator's Reseller page has responsive account cards, search/status filters, clearer inbound assignments and permission controls.
+- Activity logs show readable actions, timestamps, affected clients/inbounds and source IPs, with search and category filters.
+- New **Edit Password** permission defaults to off. When enabled, **Change Password** appears in the reseller sidebar. The current password is verified; successful changes revoke existing sessions and create an audit event.
+- Resellers keep the original inbound dashboard layout and no longer see the administrator TLS warning.
+- Login, scoped cookies, assets, APIs and live updates use **`/reseller/<path>/`**, independently of the administrator base path.
 
-- Native per-client source-IP admission in the bundled Xray `26.4.25`, identified as `TDZ-IPLimit/2`, including real-IP handling through the bundled payload proxy and live IP reporting.
-- Client IP **Clear** and **Refresh** remain independent; older in-flight refreshes cannot repopulate a cleared details view.
-- Per-client subscription IP-limit tags and hourly/12-hourly/daily/weekly/monthly/custom Traffic Reset schedules.
-- Settings-preserving updates, rollback backups, Telegram-ID compatibility and CLI menu 4's X-UI Payload Proxy.
+## Client links and CLI fixes
 
-## Install or update
+- Removed inbound-name prefixes from client subscription URI/JSON/Clash labels, Telegram-delivered config links and panel copy/export/QR actions.
+- Removed the main CLI Payload / Proxy entry and renumbered choices through **25**. Legacy instances remain accessible through `x-ui-proxy`.
+- Fixed the hidden nested menu that stalled IP SSL setup from **9. View Current Settings**. Accepts `y`, `yes` and `-y`; busy-port detection, visible dependency progress, operation timeouts and service recovery on failure/cancellation are included.
+
+## Upgrade
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v3
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v4
 ```
 
-No argument selects the latest available architecture package. `v0`, `v1`, `v2`, `v3` and full release tags are supported. Historical V0/V1/V2 releases remain available.
+No argument selects the latest published package for the server's architecture. Existing database, credentials, panel port/base path, certificates and service settings are preserved with rollback backups.
 
-## Packages and verification
+After upgrading, hard-refresh the browser, copy/distribute reseller URLs in the new `/reseller/<path>/` form, and sign in again. Existing Path IDs/passwords/assignments are retained; password-edit permission defaults to off. Existing inbounds do not have Accept Payloads enabled automatically.
 
-Linux amd64, arm64, 386, ARMv5/v6/v7 and s390x, plus Windows amd64, include matching patched cores. `x-ui-mod-source.tar.gz` contains matching panel source, tests, pinned original core source and patches. Verify assets against `SHA256SUMS`.
+## Packages and validation
 
-Verification covers V2 database migration/restart behavior; Go race tests, vet/staticcheck; installer/client models; real browser management and live permission changes; multi/shared/zero-inbound access; scoped client/traffic operations; and platform package/version/digest checks.
+- Linux: **amd64, arm64, 386, armv5, armv6, armv7, s390x**. Windows: **amd64**.
+- Matching patched cores, panel source archive, pinned original Xray source, release documentation and **SHA256SUMS** accompany the packages.
+- Verification includes Go race tests/vet/static analysis, installer and client-model tests, browser permission/path/mobile checks, legacy TDZ byte comparisons, actual transport/TLS/MUX/IP-limit traffic, live API updates and migration comparisons.
+- The test build was installed on the supplied VPS and the user confirmed that payload connections work. CLI SSL recovery was regression-tested; live certificate issuance is not part of that test.
 
-IP limits count source addresses, not physical devices. Devices sharing a public IP occupy one slot.
+Full history: [CHANGELOG.md](CHANGELOG.md).

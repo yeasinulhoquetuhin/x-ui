@@ -4,6 +4,7 @@
   :label-col="{ md: {span:8} }"
   :wrapper-col="{ md: {span:14} }"
 >
+  <a-form-item label="Accept Payloads"><a-switch v-model="inbound.stream.acceptPayloads"></a-switch></a-form-item>
   <a-form-item label="Proxy Protocol">
     <a-switch v-model="inbound.stream.ws.acceptProxyProtocol"></a-switch>
   </a-form-item>

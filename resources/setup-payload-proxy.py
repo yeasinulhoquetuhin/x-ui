@@ -121,7 +121,7 @@ WantedBy=multi-user.target
         names = [line.split()[0] for line in result.stdout.splitlines() if line.split()]
         if names:
             run(['systemctl', 'restart', *names], check=True)
-    print('X-UI Payload Proxy is ready in x-ui menu 4.')
+    print('Legacy X-UI Payload Proxy is available with x-ui-proxy. New inbounds use Accept Payloads in the panel.')
 
 
 if __name__ == '__main__':

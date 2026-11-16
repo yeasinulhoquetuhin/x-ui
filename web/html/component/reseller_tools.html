@@ -1,0 +1,26 @@
+{{define "component/resellerTools"}}
+<link rel="stylesheet" href="{{.base_path}}assets/css/reseller.css?{{.cur_ver}}">
+<script>
+Vue.component('reseller-activity', {
+  delimiters:['[[',']]'],
+  props:{visible:Boolean,accountId:Number,username:String,endpoint:String},
+  data(){return {themeSwitcher,rows:[],loading:false,error:'',search:'',category:'all',requestId:0};},
+  computed:{
+    filtered(){const key=this.search.toLowerCase();return this.rows.filter(row => (this.category==='all'||row.action.startsWith(this.category))&&[row.username,row.target,row.ip,row.action,this.label(row.action)].join(' ').toLowerCase().includes(key));},
+  },
+  watch:{visible(value){if(value){this.rows=[];this.search='';this.category='all';this.load();}else{this.requestId++;this.loading=false;}},accountId(){if(this.visible){this.rows=[];this.load();}}},
+  methods:{
+    label(action){return {'login':'Signed in','client.create':'Client created','client.update':'Client updated','client.delete':'Client deleted','client.reset':'Traffic reset','clients.reset':'All client traffic reset','clients.deleteDepleted':'Depleted clients removed','inbound.update':'Inbound updated','inbound.toggle':'Inbound status changed','account.password':'Password changed'}[action]||action;},
+    icon(action){return action==='login'?'login':action.startsWith('account.')?'lock':action.includes('delete')?'delete':action.includes('reset')?'reload':action.startsWith('inbound.')?'api':'user';},
+    date(value){return new Date(value).toLocaleString();},
+    async load(){const request=++this.requestId;this.loading=true;this.error='';try{const response=await HttpUtil.get(this.endpoint||('/panel/api/resellers/'+this.accountId+'/audit'));if(request!==this.requestId)return;if(response.success)this.rows=response.obj||[];else this.error='Could not load activity. Please retry.';}catch(_){if(request===this.requestId)this.error='Could not load activity. Please retry.';}finally{if(request===this.requestId)this.loading=false;}}
+  },
+  template:`<a-modal :visible="visible" @cancel="$emit('update:visible',false)" :footer="null" :class="themeSwitcher.currentTheme+' reseller-dialog'" width="760px" title="Activity log">
+    <div class="reseller-audit-heading"><div><strong v-text="username"></strong><p>Recent account and client activity</p></div><a-button icon="reload" :loading="loading" @click="load">Refresh</a-button></div>
+    <div class="reseller-audit-filters"><a-input-search v-model="search" allow-clear placeholder="Search activity, client or IP"></a-input-search><a-select v-model="category" :dropdown-class-name="themeSwitcher.currentTheme"><a-select-option value="all">All activity</a-select-option><a-select-option value="login">Sign-ins</a-select-option><a-select-option value="client">Clients</a-select-option><a-select-option value="inbound.">Inbounds</a-select-option><a-select-option value="account.">Account</a-select-option></a-select></div>
+    <a-alert v-if="error" type="error" :message="error" show-icon></a-alert>
+    <a-spin :spinning="loading"><div class="reseller-timeline"><a-empty v-if="!filtered.length&&!loading" :description="rows.length?'No matching activity':'No activity yet'"></a-empty><article v-for="row in filtered" :key="row.id" class="reseller-event"><div class="reseller-event-icon" :class="{'danger':row.action.includes('delete')}"><a-icon :type="icon(row.action)"></a-icon></div><div class="reseller-event-body"><div class="reseller-event-title"><strong v-text="label(row.action)"></strong><time v-text="date(row.createdAt)"></time></div><div class="reseller-event-target" v-if="row.target" v-text="row.target"></div><div class="reseller-event-meta"><span v-text="row.username"></span><span v-if="row.inboundId">Inbound #[[row.inboundId]]</span><code v-text="row.ip||'—'"></code></div></div></article></div></a-spin><div class="reseller-audit-footer">[[filtered.length]] shown · latest 100 events</div>
+  </a-modal>`
+});
+</script>
+{{end}}

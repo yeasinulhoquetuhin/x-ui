@@ -24,12 +24,13 @@ import (
 )
 
 type ResellerController struct {
-	service  service.ResellerService
-	inbound  service.InboundService
-	core     service.XrayService
-	settings service.SettingService
-	clients  InboundController
-	limiter  resellerLoginLimiter
+	service         service.ResellerService
+	inbound         service.InboundService
+	core            service.XrayService
+	settings        service.SettingService
+	clients         InboundController
+	limiter         resellerLoginLimiter
+	passwordLimiter resellerLoginLimiter
 }
 
 type resellerLoginAttempt struct {
@@ -86,12 +87,14 @@ func NewResellerController(g *gin.RouterGroup, secret []byte) *ResellerControlle
 	portal.POST("/getTwoFactorEnable", func(c *gin.Context) { jsonObj(c, false, nil) })
 	portal.GET("/logout", a.logout)
 	portal.POST("/logout", a.logout)
+	portal.POST("/panel/api/account/password", a.changePassword)
 	secured := portal.Group("")
 	secured.Use(a.authenticate)
 	secured.GET("/panel/", a.dashboard)
 	secured.GET("/panel/inbounds", a.dashboard)
 	secured.POST("/panel/setting/defaultSettings", a.defaults)
 	secured.GET("/ws", a.websocket)
+	secured.GET("/panel/api/account/activity", a.activity)
 	keys := secured.Group("/panel/api/server")
 	keys.Use(a.requireInboundEditing)
 	server := &ServerController{}
@@ -132,7 +135,7 @@ func (a *ResellerController) resolve(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	root := c.GetString("base_path")
+	root := "/reseller/"
 	c.Set("asset_path", root)
 	c.Set("base_path", root+url.PathEscape(account.Path)+"/")
 	c.Set("is_reseller", true)
@@ -236,6 +239,7 @@ func (a *ResellerController) defaults(c *gin.Context) {
 	delete(defaults, "defaultCert")
 	delete(defaults, "defaultKey")
 	defaults["canEditInbounds"] = a.account(c).CanEditInbounds
+	defaults["canEditPassword"] = a.account(c).CanEditPassword
 	jsonObj(c, defaults, nil)
 }
 
@@ -246,6 +250,60 @@ func (a *ResellerController) list(c *gin.Context) {
 		return
 	}
 	jsonObj(c, inbounds, nil)
+}
+
+func (a *ResellerController) activity(c *gin.Context) {
+	rows, err := a.service.AuditList(a.account(c).ID)
+	jsonObj(c, rows, err)
+}
+
+func (a *ResellerController) changePassword(c *gin.Context) {
+	account := session.GetReseller(c)
+	if account == nil {
+		pureJsonMsg(c, http.StatusUnauthorized, false, "Please log in again")
+		return
+	}
+	if !account.CanEditPassword {
+		pureJsonMsg(c, http.StatusForbidden, false, "Password editing is disabled for your account")
+		return
+	}
+	key := strconv.Itoa(account.ID) + ":" + resellerPeer(c)
+	if !a.passwordLimiter.allow(key) {
+		pureJsonMsg(c, http.StatusTooManyRequests, false, "Too many attempts. Try again in five minutes.")
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+	var form struct {
+		Current  string `json:"currentPassword" form:"currentPassword"`
+		Password string `json:"newPassword" form:"newPassword"`
+		Confirm  string `json:"confirmPassword" form:"confirmPassword"`
+	}
+	if err := c.ShouldBind(&form); err != nil || form.Password == "" || form.Password != form.Confirm {
+		pureJsonMsg(c, http.StatusBadRequest, false, "Enter and confirm your new password")
+		return
+	}
+	err := a.service.ChangeOwnPassword(account, form.Current, form.Password, resellerPeer(c))
+	if errors.Is(err, service.ErrResellerPasswordPermission) {
+		pureJsonMsg(c, http.StatusForbidden, false, err.Error())
+		return
+	}
+	if errors.Is(err, service.ErrResellerSessionRevoked) {
+		pureJsonMsg(c, http.StatusUnauthorized, false, err.Error())
+		return
+	}
+	if err != nil {
+		jsonMsg(c, "Password change failed", err)
+		return
+	}
+	a.passwordLimiter.clear(key)
+	s := sessions.Default(c)
+	s.Clear()
+	s.Options(sessions.Options{Path: c.GetString("base_path"), MaxAge: -1, HttpOnly: true, Secure: c.Request.TLS != nil, SameSite: http.SameSiteLaxMode})
+	if err := s.Save(); err != nil {
+		jsonObj(c, nil, err)
+		return
+	}
+	jsonMsg(c, "Password updated. Log in with your new password.", nil)
 }
 
 func (a *ResellerController) onlines(c *gin.Context) {
@@ -537,7 +595,7 @@ func (a *ResellerController) websocket(c *gin.Context) {
 				return err
 			}
 			conn.SetWriteDeadline(time.Now().Add(writeWait))
-			for _, message := range []any{gin.H{"type": "resellerAccess", "payload": gin.H{"canEditInbounds": current.CanEditInbounds}}, gin.H{"type": "inbounds", "payload": inbounds}, gin.H{"type": "traffic", "payload": gin.H{"onlineClients": online, "lastOnlineMap": last}}} {
+			for _, message := range []any{gin.H{"type": "resellerAccess", "payload": gin.H{"canEditInbounds": current.CanEditInbounds, "canEditPassword": current.CanEditPassword}}, gin.H{"type": "inbounds", "payload": inbounds}, gin.H{"type": "traffic", "payload": gin.H{"onlineClients": online, "lastOnlineMap": last}}} {
 				if err := conn.WriteJSON(message); err != nil {
 					return err
 				}
@@ -567,7 +625,7 @@ func (a *ResellerController) websocket(c *gin.Context) {
 				if err != nil {
 					return
 				}
-				scope := fmt.Sprint(current.CanEditInbounds, ids)
+				scope := fmt.Sprint(current.CanEditInbounds, current.CanEditPassword, ids)
 				if seconds%5 == 0 || scope != lastScope {
 					if send() != nil {
 						return

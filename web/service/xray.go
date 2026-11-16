@@ -235,6 +235,16 @@ func (s *XrayService) RestartXray(isForce bool) error {
 	if err != nil {
 		return err
 	}
+	for _, inbound := range xrayConfig.InboundConfigs {
+		payload, err := xray.InjectPayloadEnabled(inbound.StreamSettings)
+		if err != nil {
+			return err
+		}
+		if payload && !xray.NativePayloadAvailable() {
+			result = "Accept Payloads requires the matching TDZ Payload/3 core"
+			return errors.New(result)
+		}
+	}
 	if !xray.NativeIPLimitAvailable() {
 		raw, err := os.ReadFile(xray.GetIPLimitConfigPath())
 		if err != nil {
