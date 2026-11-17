@@ -46,8 +46,9 @@ func TestNativePayloadTransportMatrix(t *testing.T) {
 	os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}), 0600)
 	for _, security := range []string{"none", "tls"} {
 		for _, network := range []string{"tcp", "ws", "httpupgrade", "grpc", "xhttp"} {
-			for _, enabled := range []bool{false, true} {
-				t.Run(network+"/"+security+"/payload="+strconv.FormatBool(enabled), func(t *testing.T) {
+			for _, mode := range []string{"off/direct", "on/direct", "on/payload"} {
+				enabled, inject := mode != "off/direct", mode == "on/payload"
+				t.Run(network+"/"+security+"/"+mode, func(t *testing.T) {
 					dir := t.TempDir()
 					freePort := func() int {
 						l, e := net.Listen("tcp", "127.0.0.1:0")
@@ -142,7 +143,7 @@ func TestNativePayloadTransportMatrix(t *testing.T) {
 								defer out.Close()
 								out.SetDeadline(time.Now().Add(5 * time.Second))
 								r := bufio.NewReader(out)
-								if enabled {
+								if inject {
 									io.WriteString(out, "CONNECT endpoint:443 HTTP/1.1\r\nHost: example.test\r\n\r\n")
 									var response strings.Builder
 									for {
@@ -155,7 +156,7 @@ func TestNativePayloadTransportMatrix(t *testing.T) {
 											break
 										}
 									}
-									if response.String() != "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n" {
+									if response.String() != "HTTP/1.1 101 <b><font color=\"red\" size=\"7\">Script By:</font> <font color=\"#0057B7\" size=\"7\">tuhinbro.com</font></b>\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n" {
 										return
 									}
 								}

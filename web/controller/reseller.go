@@ -132,6 +132,11 @@ func resellerPeer(c *gin.Context) string {
 func (a *ResellerController) resolve(c *gin.Context) {
 	account, err := a.service.ByPath(c.Param("resellerPath"))
 	if err != nil {
+		if errors.Is(err, service.ErrResellerExpired) {
+			pureJsonMsg(c, http.StatusForbidden, false, err.Error())
+			c.Abort()
+			return
+		}
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}

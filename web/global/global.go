@@ -3,14 +3,16 @@ package global
 
 import (
 	"context"
+	"sync"
 	_ "unsafe"
 
 	"github.com/robfig/cron/v3"
 )
 
 var (
-	webServer WebServer
-	subServer SubServer
+	webServer   WebServer
+	subServer   SubServer
+	subServerMu sync.RWMutex
 )
 
 // WebServer interface defines methods for accessing the web server instance.
@@ -37,10 +39,14 @@ func GetWebServer() WebServer {
 
 // SetSubServer sets the global subscription server instance.
 func SetSubServer(s SubServer) {
+	subServerMu.Lock()
+	defer subServerMu.Unlock()
 	subServer = s
 }
 
 // GetSubServer returns the global subscription server instance.
 func GetSubServer() SubServer {
+	subServerMu.RLock()
+	defer subServerMu.RUnlock()
 	return subServer
 }

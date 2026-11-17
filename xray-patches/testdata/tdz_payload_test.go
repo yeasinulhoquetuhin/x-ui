@@ -148,3 +148,81 @@ func TestTDZPayloadTimeoutIsIdlePerRead(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTDZAutoPayloadNativeAndInjectedHandshakes(t *testing.T) {
+	ws := "GET /native HTTP/1.1\r\nHost: test\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+	for _, tc := range []struct {
+		name, network, input string
+		payload              bool
+	}{
+		{"raw-vless", "", "\x00\x11\xff\x80\r\n\r\n", false},
+		{"tls-clienthello", "websocket", "\x16\x03\x01\x00\x05hello", false},
+		{"http2", "", "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n", false},
+		{"normal-ws", "websocket", ws, false},
+		{"normal-httpupgrade", "httpupgrade", "GET /native HTTP/1.1\r\nHost: test\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n", false},
+		{"normal-xhttp", "splithttp", "POST /native/session/0 HTTP/1.1\r\nHost: test\r\nContent-Length: 0\r\n\r\n", false},
+		{"connect-payload", "websocket", "CONNECT endpoint:443 HTTP/1.1\r\n\r\n", true},
+		{"absolute-uri-payload", "", "GET http://example.test/ HTTP/1.1\r\nHost: example.test\r\n\r\n", true},
+		{"custom-payload", "", "CUSTOM opaque preface\r\n\r\n", true},
+		{"ws-looking-payload", "websocket", strings.Replace(ws, "/native", "/payload", 1), true},
+		{"explicit-ws-payload", "websocket", strings.Replace(ws, "Host: test", "Host: test\r\nX-TDZ-Payload: 1", 1), true},
+	} {
+		for _, fragmented := range []bool{false, true} {
+			t.Run(tc.name+"/split="+string(rune('0'+boolInt(fragmented))), func(t *testing.T) {
+				server, client := net.Pipe()
+				defer server.Close()
+				defer client.Close()
+				client.SetDeadline(time.Now().Add(2 * time.Second))
+				pending := []byte("native bytes\x00\xff\r\n\r\nsecond header stays")
+				want := pending
+				if !tc.payload {
+					want = append([]byte(tc.input), pending...)
+				}
+				done := make(chan error, 1)
+				go func() {
+					conn, err := tdzAcceptAutoPayload(server, tc.network, "/native", time.Second)
+					if err == nil {
+						data := make([]byte, len(want))
+						_, err = io.ReadFull(conn, data)
+						if err == nil && !bytes.Equal(data, want) {
+							err = io.ErrUnexpectedEOF
+						}
+						if err == nil && (conn.LocalAddr() != server.LocalAddr() || conn.RemoteAddr() != server.RemoteAddr()) {
+							err = io.ErrUnexpectedEOF
+						}
+						if err == nil {
+							_, err = conn.Write(data)
+						}
+					}
+					done <- err
+				}()
+				go func() {
+					if fragmented {
+						for _, b := range []byte(tc.input) {
+							if _, err := client.Write([]byte{b}); err != nil {
+								return
+							}
+						}
+						client.Write(pending)
+					} else {
+						client.Write(append([]byte(tc.input), pending...))
+					}
+				}()
+				response := want
+				if tc.payload {
+					response = append([]byte(tdzPayloadResponse), want...)
+				}
+				got := make([]byte, len(response))
+				if _, err := io.ReadFull(client, got); err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(got, response) {
+					t.Fatalf("handshake/stream changed: %q", got)
+				}
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+}

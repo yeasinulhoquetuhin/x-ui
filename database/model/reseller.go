@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // ResellerAccess is the v2 per-inbound record, retained for one-time migration.
 type ResellerAccess struct {
 	ID           int    `json:"id" gorm:"primaryKey;autoIncrement"`
@@ -18,6 +20,7 @@ type ResellerAccount struct {
 	Enabled         bool   `json:"enabled"`
 	CanEditInbounds bool   `json:"canEditInbounds" gorm:"default:false"`
 	CanEditPassword bool   `json:"canEditPassword" gorm:"default:false"`
+	ExpiryTime      int64  `json:"expiryTime" gorm:"default:0"`
 	Path            string `json:"path" gorm:"uniqueIndex;not null"`
 	Username        string `json:"username"`
 	PasswordHash    string `json:"-"`
@@ -25,6 +28,11 @@ type ResellerAccount struct {
 	InboundIDs      []int  `json:"inboundIds" gorm:"-"`
 	CreatedAt       int64  `json:"createdAt" gorm:"autoCreateTime:milli"`
 	UpdatedAt       int64  `json:"updatedAt" gorm:"autoUpdateTime:milli"`
+}
+
+// Zero means unlimited. Expiry is rechecked on every authenticated request.
+func (r *ResellerAccount) IsExpired() bool {
+	return r.ExpiryTime != 0 && time.Now().UnixMilli() >= r.ExpiryTime
 }
 
 type ResellerInbound struct {

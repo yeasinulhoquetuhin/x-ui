@@ -30,6 +30,9 @@ func CurrentReseller(principal ResellerPrincipal) *model.ResellerAccount {
 		First(&account).Error != nil {
 		return nil
 	}
+	if account.IsExpired() {
+		return nil
+	}
 	return &account
 }
 

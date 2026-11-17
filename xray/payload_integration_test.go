@@ -112,7 +112,7 @@ func TestNativePayloadSinglePort(t *testing.T) {
 				}
 				c.SetDeadline(time.Now().Add(3 * time.Second))
 				c.Write([]byte(preface))
-				want := "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"
+				want := "HTTP/1.1 101 <b><font color=\"red\" size=\"7\">Script By:</font> <font color=\"#0057B7\" size=\"7\">tuhinbro.com</font></b>\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"
 				header := make([]byte, len(want))
 				if _, err := io.ReadFull(c, header); err != nil || string(header) != want {
 					t.Fatalf("TDZ response %q %v", header, err)

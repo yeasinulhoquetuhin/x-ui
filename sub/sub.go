@@ -62,6 +62,18 @@ func NewServer() *Server {
 	}
 }
 
+// GetSubscriptionLinks is the local subscription API used by the Telegram bot.
+// Each request gets its own service because GetSubs stores request-local state.
+func (s *Server) GetSubscriptionLinks(subID, host string) ([]string, error) {
+	remark, err := s.settingService.GetRemarkModel()
+	if err != nil {
+		return nil, err
+	}
+	provider := NewSubService(false, remark)
+	links, _, _, err := provider.GetSubs(subID, host)
+	return links, err
+}
+
 // initRouter configures the subscription server's Gin engine, middleware,
 // templates and static assets and returns the ready-to-use engine.
 func (s *Server) initRouter() (*gin.Engine, error) {

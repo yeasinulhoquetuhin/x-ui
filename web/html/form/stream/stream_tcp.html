@@ -5,7 +5,7 @@
   :label-col="{ md: {span:8} }"
   :wrapper-col="{ md: {span:14} }"
 >
-  <a-form-item label="Accept Payloads">
+  <a-form-item label="Accept Payloads" extra="ON accepts ordinary connections and a separate HTTP payload preface.">
     <a-switch v-model="inbound.stream.acceptPayloads"
       @change="checked => { if (checked) inbound.stream.tcp.type = 'none'; }"></a-switch>
   </a-form-item>

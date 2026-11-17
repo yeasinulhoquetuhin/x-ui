@@ -40,5 +40,5 @@ mkdir -p "$(dirname "$destination")"
 export CGO_ENABLED=0
 (
     cd "$source_dir"
-    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2+Payload/3' -o "$destination" ./main
+    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2+Payload/3+Auto/1' -o "$destination" ./main
 )

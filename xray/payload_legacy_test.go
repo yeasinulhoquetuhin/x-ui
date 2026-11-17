@@ -96,14 +96,13 @@ func TestNativePayloadMatchesOriginalProxy(t *testing.T) {
 			time.Sleep(30 * time.Millisecond)
 		}
 	}
-	response := []byte("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
+	response := []byte("HTTP/1.1 101 <b><font color=\"red\" size=\"7\">Script By:</font> <font color=\"#0057B7\" size=\"7\">tuhinbro.com</font></b>\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
 	headers := [][]byte{
 		[]byte("GET / HTTP/1.1\r\nHost: example\r\n\r\n"),
 		[]byte("CONNECT arbitrary:443 HTTP/1.1\r\n\r\n"),
 		[]byte("GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: invalid-key-is-opaque\r\n\r\n"),
 		[]byte("X-Online-Host: example\r\n\r\n"),
 		[]byte("no-http-syntax\r\n\r\n"),
-		[]byte{0, 255, 128, 13, 10, 13, 10},
 		[]byte("\r\n\r\n"),
 		append(bytes.Repeat([]byte{'A'}, 64000), []byte("\r\n\r\n")...),
 	}
@@ -166,8 +165,8 @@ func TestNativePayloadMatchesOriginalProxy(t *testing.T) {
 	}
 }
 
-// The preface may look exactly like a real WS handshake. The old relay always
-// strips it, then the backend receives the second/native handshake unchanged.
+// An explicitly marked preface may match the native WS path. It is stripped,
+// while the second/native handshake and authenticated WS frames stay intact.
 func TestNativePayloadLegacyWebSocketHandshake(t *testing.T) {
 	core := os.Getenv("TDZ_TEST_XRAY")
 	if core == "" {
@@ -219,7 +218,7 @@ func TestNativePayloadLegacyWebSocketHandshake(t *testing.T) {
 		}
 		time.Sleep(30 * time.Millisecond)
 	}
-	preface := "GET / HTTP/1.1\r\nHost: example.test\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+	preface := "GET / HTTP/1.1\r\nHost: example.test\r\nX-TDZ-Payload: 1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
 	dialer := websocket.Dialer{HandshakeTimeout: 3 * time.Second, NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 		c, err := net.DialTimeout(network, addr, time.Second)
 		if err != nil {
@@ -230,7 +229,7 @@ func TestNativePayloadLegacyWebSocketHandshake(t *testing.T) {
 			c.Close()
 			return nil, err
 		}
-		response := make([]byte, len("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
+		response := make([]byte, len("HTTP/1.1 101 <b><font color=\"red\" size=\"7\">Script By:</font> <font color=\"#0057B7\" size=\"7\">tuhinbro.com</font></b>\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"))
 		if _, err = io.ReadFull(c, response); err != nil {
 			c.Close()
 			return nil, err

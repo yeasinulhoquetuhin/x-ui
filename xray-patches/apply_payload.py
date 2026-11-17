@@ -46,6 +46,20 @@ def replace(name, before, after):
 for name in ('tdz_payload.go', 'tdz_payload_test.go'):
     (root / 'transport/internet/tcp' / name).unlink(missing_ok=True)
 
+# Upgrade existing Payload/3 hooks in a cached core to transport-aware detection.
+for name, arguments in (
+    ('websocket', ', "websocket", wsSettings.GetNormalizedPath()'),
+    ('httpupgrade', ', "httpupgrade", transportConfiguration.GetNormalizedPath()'),
+    ('splithttp', ', "splithttp", l.config.GetNormalizedPath()'),
+):
+    path = root / f'transport/internet/{name}/hub.go'
+    text = path.read_text()
+    text = text.replace('internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads)',
+                        'internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads' + arguments + ')')
+    text = text.replace('internet.TDZPayloadListener(l.listener, streamSettings.AcceptPayloads)',
+                        'internet.TDZPayloadListener(l.listener, streamSettings.AcceptPayloads' + arguments + ')')
+    path.write_text(text)
+
 replace('transport/internet/config.proto', '  SocketConfig socket_settings = 6;',
         '  SocketConfig socket_settings = 6;\n  bool accept_payloads = 13;')
 replace('infra/conf/transport_internet.go', 'type TCPConfig struct {',
@@ -71,13 +85,13 @@ replace('transport/internet/memory_settings.go', '\t\tmss.SocketSettings = s.Soc
 replace('transport/internet/tcp/hub.go', '\tl.listener = listener',
         '\tlistener = internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads)\n\tl.listener = listener')
 replace('transport/internet/websocket/hub.go', '\tif config := v2tls.ConfigFromStreamSettings(streamSettings);',
-        '\tlistener = internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads)\n\tif config := v2tls.ConfigFromStreamSettings(streamSettings);')
+        '\tlistener = internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads, "websocket", wsSettings.GetNormalizedPath())\n\tif config := v2tls.ConfigFromStreamSettings(streamSettings);')
 replace('transport/internet/httpupgrade/hub.go', '\tif config := v2tls.ConfigFromStreamSettings(streamSettings);',
-        '\tlistener = internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads)\n\tif config := v2tls.ConfigFromStreamSettings(streamSettings);')
+        '\tlistener = internet.TDZPayloadListener(listener, streamSettings.AcceptPayloads, "httpupgrade", transportConfiguration.GetNormalizedPath())\n\tif config := v2tls.ConfigFromStreamSettings(streamSettings);')
 replace('transport/internet/grpc/hub.go', '\t\tif config := reality.ConfigFromStreamSettings(settings);',
         '\t\tstreamListener = internet.TDZPayloadListener(streamListener, settings.AcceptPayloads)\n\t\tif config := reality.ConfigFromStreamSettings(settings);')
 replace('transport/internet/splithttp/hub.go', '\tif l.listener != nil {\n\t\tif config := tls.',
-        '\tif l.listener != nil {\n\t\tl.listener = internet.TDZPayloadListener(l.listener, streamSettings.AcceptPayloads)\n\t\tif config := tls.')
+        '\tif l.listener != nil {\n\t\tl.listener = internet.TDZPayloadListener(l.listener, streamSettings.AcceptPayloads, "splithttp", l.config.GetNormalizedPath())\n\t\tif config := tls.')
 replace('transport/internet/splithttp/hub.go', '\tvar err error\n\tif port ==',
         '\tif l.isH3 && streamSettings.AcceptPayloads { return nil, errors.New("Accept Payloads does not support XHTTP over QUIC") }\n\tvar err error\n\tif port ==')
 

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mhsanaei/3x-ui/v2/database"
@@ -29,6 +31,8 @@ type ResellerAccessForm struct {
 	CanEditInbounds bool   `json:"canEditInbounds" form:"canEditInbounds"`
 	CanEditPassword bool   `json:"canEditPassword" form:"canEditPassword"`
 	InboundIDs      []int  `json:"inboundIds" form:"inboundIds"`
+	ExpiryTime      *int64 `json:"expiryTime" form:"expiryTime"`
+	Duration        *int64 `json:"duration" form:"duration"`
 }
 
 // Assignment/permission updates cannot race an authenticated reseller write.
@@ -106,6 +110,9 @@ func (s *ResellerService) AssignedIDs(account *model.ResellerAccount) ([]int, er
 }
 
 func (s *ResellerService) HasInbound(account *model.ResellerAccount, id int) bool {
+	if account == nil || account.IsExpired() {
+		return false
+	}
 	var count int64
 	return id > 0 && database.GetDB().Model(&model.ResellerInbound{}).
 		Where("reseller_id = ? AND inbound_id = ?", account.ID, id).
@@ -119,8 +126,13 @@ func (s *ResellerService) ByPath(path string) (*model.ResellerAccount, error) {
 	}
 	var account model.ResellerAccount
 	err := database.GetDB().Where("path = ? AND enabled = ?", path, true).First(&account).Error
+	if err == nil && account.IsExpired() {
+		return nil, ErrResellerExpired
+	}
 	return &account, err
 }
+
+var ErrResellerExpired = errors.New("reseller account has expired; contact the administrator")
 
 func (s *ResellerService) Save(adminID, id int, form ResellerAccessForm) (*model.ResellerAccount, error) {
 	ResellerAccessMu.Lock()
@@ -165,7 +177,29 @@ func (s *ResellerService) Save(adminID, id int, form ResellerAccessForm) (*model
 			}
 		}
 	}
-	changed := account.Enabled != form.Enabled || account.Path != form.Path || account.Username != form.Username
+	expiry := account.ExpiryTime
+	if form.ExpiryTime != nil {
+		expiry = *form.ExpiryTime
+	}
+	if form.Duration != nil {
+		if form.ExpiryTime != nil {
+			return nil, errors.New("provide duration or expiryTime, not both")
+		}
+		days := *form.Duration
+		now := time.Now().UnixMilli()
+		const dayMilliseconds int64 = 24 * 60 * 60 * 1000
+		if days < 0 || days > (math.MaxInt64-now)/dayMilliseconds {
+			return nil, errors.New("duration must be a non-negative whole number of days within the timestamp range")
+		}
+		expiry = 0
+		if days > 0 {
+			expiry = now + days*dayMilliseconds
+		}
+	}
+	if expiry < 0 {
+		return nil, errors.New("reseller expiry must be zero or a Unix timestamp in milliseconds")
+	}
+	changed := account.Enabled != form.Enabled || account.Path != form.Path || account.Username != form.Username || account.ExpiryTime != expiry
 	if form.Password != "" {
 		hash, err := hashResellerPassword(form.Password)
 		if err != nil {
@@ -180,6 +214,7 @@ func (s *ResellerService) Save(adminID, id int, form ResellerAccessForm) (*model
 	account.Enabled, account.Path, account.Username = form.Enabled, form.Path, form.Username
 	account.CanEditInbounds = form.CanEditInbounds
 	account.CanEditPassword = form.CanEditPassword
+	account.ExpiryTime = expiry
 	if changed || account.Version == "" {
 		account.Version = uuid.NewString()
 	}
@@ -228,6 +263,9 @@ func (s *ResellerService) ChangeOwnPassword(principal *model.ResellerAccount, cu
 	var account model.ResellerAccount
 	if principal == nil || database.GetDB().Where("id = ? AND path = ? AND version = ? AND enabled = ?", principal.ID, principal.Path, principal.Version, true).First(&account).Error != nil {
 		return ErrResellerSessionRevoked
+	}
+	if account.IsExpired() {
+		return ErrResellerExpired
 	}
 	if !account.CanEditPassword {
 		return ErrResellerPasswordPermission
@@ -287,6 +325,9 @@ func (s *ResellerService) validateAssignmentIsolation(ids []int) error {
 }
 
 func (s *ResellerService) Inbounds(account *model.ResellerAccount) ([]*model.Inbound, error) {
+	if account == nil || account.IsExpired() {
+		return nil, ErrResellerExpired
+	}
 	ids, err := s.AssignedIDs(account)
 	if err != nil {
 		return nil, err

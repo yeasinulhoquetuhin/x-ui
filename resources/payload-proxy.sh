@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.3.1"
+VERSION="1.3.2"
 BASE_DIR="${XUI_PROXY_BASE_DIR:-${TDZP_BASE_DIR:-/etc/x-ui/payload-proxy}}"
 INSTANCES_DIR="$BASE_DIR/instances"
 FIREWALL_DIR="$BASE_DIR/firewall"
@@ -294,11 +294,12 @@ import sys
 PUBLIC_PORT = int(sys.argv[1])
 BACKEND_PORT = int(sys.argv[2])
 HEADER_END = b"\r\n\r\n"
-RESPONSE = (
-    b"HTTP/1.1 101 Switching Protocols\r\n"
+SWITCHING_RESPONSE_BASE = (
+    b'HTTP/1.1 101 <b><font color="red" size="7">Script By:</font> <font color="#0057B7" size="7">tuhinbro.com</font></b>\r\n'
     b"Upgrade: websocket\r\n"
-    b"Connection: Upgrade\r\n\r\n"
+    b"Connection: Upgrade\r\n"
 )
+RESPONSE = SWITCHING_RESPONSE_BASE + b"\r\n"
 
 
 def tune(writer):
