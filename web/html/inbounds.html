@@ -1119,9 +1119,6 @@
       lastOnlineMap: {},
       isRefreshEnabled: localStorage.getItem("isRefreshEnabled") === "true" ? true : false,
       refreshing: false,
-      inboundsRequest: null,
-      onlineRequest: null,
-      refreshLoopRunning: false,
       refreshInterval: Number(localStorage.getItem("refreshInterval")) || 5000,
       subSettings: {
         enable: false,
@@ -1141,55 +1138,36 @@
       loading(spinning = true) {
         this.loadingStates.spinning = spinning;
       },
-      getDBInbounds() {
-        if (this.inboundsRequest) return this.inboundsRequest;
+      async getDBInbounds() {
         this.refreshing = true;
-        this.inboundsRequest = Promise.resolve().then(async () => {
-          try {
-            const msg = await HttpUtil.get('/panel/api/inbounds/list', null, {timeout: 15000});
-            if (!msg?.success) return;
-            if (msg.obj != null && !Array.isArray(msg.obj)) throw new Error('Invalid inbound list response');
-            this.setInbounds(msg.obj);
-            this.refreshOnlineStatus();
-          } catch (error) {
-            console.error('Failed to load inbounds:', error);
-          } finally {
-            this.refreshing = false;
-            this.loadingStates.fetched = true;
-            this.inboundsRequest = null;
-          }
-        });
-        return this.inboundsRequest;
-      },
-      refreshOnlineStatus() {
-        if (this.onlineRequest) return this.onlineRequest;
-        this.onlineRequest = Promise.all([this.getLastOnlineMap(), this.getOnlineUsers()])
-          .then(() => {
-            this.dbInbounds.forEach(dbInbound => {
-              if (this.clientCount[dbInbound.id]) {
-                this.$set(this.clientCount, dbInbound.id, this.getClientCounts(dbInbound, dbInbound.toInbound()));
-              }
-            });
-            if (this.enableFilter) this.filterInbounds();
-          })
-          .catch(error => console.error('Failed to load online status:', error))
-          .finally(() => { this.onlineRequest = null; });
-        return this.onlineRequest;
-      },
-      async getOnlineUsers() {
-        const msg = await HttpUtil.post('/panel/api/inbounds/onlines', null, {timeout: 10000});
-        if (!msg?.success) {
+        const msg = await HttpUtil.get('/panel/api/inbounds/list');
+        if (!msg.success) {
+          this.refreshing = false;
           return;
         }
-        this.onlineClients = Array.isArray(msg.obj) ? msg.obj : [];
+
+        await this.getLastOnlineMap();
+        await this.getOnlineUsers();
+
+        this.setInbounds(msg.obj);
+        setTimeout(() => {
+          this.refreshing = false;
+        }, 500);
+      },
+      async getOnlineUsers() {
+        const msg = await HttpUtil.post('/panel/api/inbounds/onlines');
+        if (!msg.success) {
+          return;
+        }
+        this.onlineClients = msg.obj != null ? msg.obj : [];
       },
       async getLastOnlineMap() {
-        const msg = await HttpUtil.post('/panel/api/inbounds/lastOnline', null, {timeout: 10000});
-        if (!msg?.success || !msg.obj || typeof msg.obj !== 'object' || Array.isArray(msg.obj)) return;
+        const msg = await HttpUtil.post('/panel/api/inbounds/lastOnline');
+        if (!msg.success || !msg.obj) return;
         this.lastOnlineMap = msg.obj || {}
       },
       async getDefaultSettings() {
-        const msg = await HttpUtil.post('/panel/setting/defaultSettings', null, {timeout: 15000});
+        const msg = await HttpUtil.post('/panel/setting/defaultSettings');
         if (!msg.success) {
           return;
         }
@@ -1216,22 +1194,21 @@
         }
       },
       setInbounds(dbInbounds) {
-        const nextInbounds = [], nextDBInbounds = [], nextClientCount = [];
-        for (const inbound of (Array.isArray(dbInbounds) ? dbInbounds : [])) {
+        this.inbounds.splice(0);
+        this.dbInbounds.splice(0);
+        this.clientCount.splice(0);
+        for (const inbound of dbInbounds) {
           const dbInbound = new DBInbound(inbound);
-          const toInbound = dbInbound.toInbound();
-          nextInbounds.push(toInbound);
-          nextDBInbounds.push(dbInbound);
+          to_inbound = dbInbound.toInbound()
+          this.inbounds.push(to_inbound);
+          this.dbInbounds.push(dbInbound);
           if ([Protocols.VMESS, Protocols.VLESS, Protocols.TROJAN, Protocols.SHADOWSOCKS, Protocols.HYSTERIA].includes(inbound.protocol)) {
-            if (dbInbound.isSS && (!toInbound.isSSMultiUser)) {
+            if (dbInbound.isSS && (!to_inbound.isSSMultiUser)) {
               continue;
             }
-            nextClientCount[inbound.id] = this.getClientCounts(inbound, toInbound);
+            this.clientCount[inbound.id] = this.getClientCounts(inbound, to_inbound);
           }
         }
-        this.inbounds = nextInbounds;
-        this.dbInbounds = nextDBInbounds;
-        this.clientCount = nextClientCount;
         if (!this.loadingStates.fetched) {
           this.loadingStates.fetched = true
         }
@@ -1243,9 +1220,9 @@
       },
       getClientCounts(dbInbound, inbound) {
         let clientCount = 0, active = [], deactive = [], depleted = [], expiring = [], online = [], comments = new Map();
-        const clients = Array.isArray(inbound.clients) ? inbound.clients : [];
-        const clientStats = Array.isArray(dbInbound.clientStats) ? dbInbound.clientStats : [];
-        const now = new Date().getTime();
+        clients = inbound.clients;
+        clientStats = dbInbound.clientStats
+        now = new Date().getTime()
         if (clients) {
           clientCount = clients.length;
           if (dbInbound.enable) {
@@ -2004,19 +1981,13 @@
         txtModal.show('{{ i18n "pages.inbounds.inboundData" }}', JSON.stringify(dbInbound, null, 2));
       },
       async startDataRefreshLoop() {
-        if (this.refreshLoopRunning) return;
-        this.refreshLoopRunning = true;
-        try {
-          while (this.isRefreshEnabled) {
-            try {
-              await this.getDBInbounds();
-            } catch (e) {
-              console.error(e);
-            }
-            await PromiseUtil.sleep(this.refreshInterval);
+        while (this.isRefreshEnabled) {
+          try {
+            await this.getDBInbounds();
+          } catch (e) {
+            console.error(e);
           }
-        } finally {
-          this.refreshLoopRunning = false;
+          await PromiseUtil.sleep(this.refreshInterval);
         }
       },
       toggleRefresh() {
@@ -2031,11 +2002,8 @@
       async manualRefresh() {
         if (!this.refreshing) {
           this.loadingStates.spinning = true;
-          try {
-            await this.getDBInbounds();
-          } finally {
-            this.loadingStates.spinning = false;
-          }
+          await this.getDBInbounds();
+          this.loadingStates.spinning = false;
         }
       },
       pagination(obj) {
@@ -2079,7 +2047,7 @@
       this.getDefaultSettings();
       
       // Initial data fetch
-      this.getDBInbounds().finally(() => {
+      this.getDBInbounds().then(() => {
         this.loading(false);
       });
 
