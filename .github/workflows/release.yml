@@ -74,6 +74,11 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_*.py'
           node --test tests/client_models.test.cjs
 
+      - name: Test native DNSTT exemption and mixed ordinary IP admission
+        run: |
+          go -C .cache/xray-core build -trimpath -o "$PWD/.cache/dnstt-client" www.bamsoftware.com/git/dnstt.git/dnstt-client
+          TDZ_TEST_XRAY="$PWD/.cache/xray-test" TDZ_TEST_DNSTT_CLIENT="$PWD/.cache/dnstt-client" go test ./xray -run TestNativeSlowDNSIPLimitExemption -count=1 -timeout=5m
+
   build:
     needs: analyze
     permissions:
@@ -138,7 +143,7 @@ jobs:
           cp x-ui.service.rhel x-ui/
           cp x-ui.sh x-ui/
           cp -r resources x-ui/
-          cp README.md RELEASE_NOTES.md CHANGELOG.md ACCEPT_PAYLOADS.md LICENSE x-ui/
+          cp README.md RELEASE_NOTES.md CHANGELOG.md ACCEPT_PAYLOADS.md SLOWDNS.md LICENSE x-ui/
           mv x-ui/xui-release x-ui/x-ui
           mkdir x-ui/bin
           cd x-ui/bin
@@ -237,7 +242,7 @@ jobs:
         run: |
           mkdir x-ui
           Copy-Item xui-release.exe x-ui\x-ui.exe
-          Copy-Item README.md, RELEASE_NOTES.md, CHANGELOG.md, ACCEPT_PAYLOADS.md, LICENSE -Destination x-ui
+          Copy-Item README.md, RELEASE_NOTES.md, CHANGELOG.md, ACCEPT_PAYLOADS.md, SLOWDNS.md, LICENSE -Destination x-ui
           mkdir x-ui\bin
           cd x-ui\bin
 
@@ -281,3 +286,44 @@ jobs:
           file: x-ui-windows-amd64.zip
           asset_name: x-ui-windows-amd64.zip
           overwrite: false
+
+  release-manifest:
+    name: Verify release and publish source/checksums
+    needs: [build, build-windows]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v6
+
+      - name: Collect and validate release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release/verify
+          gh release download "$GITHUB_REF_NAME" --pattern 'x-ui-linux-*.tar.gz' --pattern 'x-ui-windows-amd64.zip' --dir release
+          for arch in amd64 arm64 386 armv5 armv6 armv7 s390x; do
+            test -s "release/x-ui-linux-$arch.tar.gz"
+            tar -tzf "release/x-ui-linux-$arch.tar.gz" > "release/verify/$arch-files.txt"
+            grep -q '^x-ui/SLOWDNS.md$' "release/verify/$arch-files.txt"
+            grep -q '^x-ui/resources/slowdns-routing.sh$' "release/verify/$arch-files.txt"
+          done
+          test -s release/x-ui-windows-amd64.zip
+          unzip -Z1 release/x-ui-windows-amd64.zip > release/verify/windows-files.txt
+          grep -Eq '^x-ui/SLOWDNS.md$' release/verify/windows-files.txt
+          tar -xzf release/x-ui-linux-amd64.tar.gz -C release/verify x-ui/x-ui x-ui/bin/xray-linux-amd64 x-ui/bin/geoip.dat x-ui/bin/geosite.dat x-ui/bin/geoip_IR.dat x-ui/bin/geosite_IR.dat x-ui/bin/geoip_RU.dat x-ui/bin/geosite_RU.dat
+          release/verify/x-ui/x-ui -v | grep -F "${GITHUB_REF_NAME#v}"
+          release/verify/x-ui/bin/xray-linux-amd64 -version | grep -F 'TDZ-IPLimit/2+Payload/3+Auto/1+SlowDNS/1'
+
+      - name: Build source and checksum manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git archive --format=tar.gz --prefix=x-ui-source/ HEAD > release/x-ui-mod-source.tar.gz
+          cp third_party/xray-core-v26.4.25-source.tar.gz release/
+          cp README.md RELEASE_NOTES.md CHANGELOG.md ACCEPT_PAYLOADS.md SLOWDNS.md LICENSE release/
+          cp release/verify/x-ui/bin/*.dat release/
+          (cd release && sha256sum *.tar.gz *.zip *.md *.dat LICENSE > SHA256SUMS && sha256sum -c SHA256SUMS)
+          gh release upload "$GITHUB_REF_NAME" release/x-ui-mod-source.tar.gz release/xray-core-v26.4.25-source.tar.gz release/README.md release/RELEASE_NOTES.md release/CHANGELOG.md release/ACCEPT_PAYLOADS.md release/SLOWDNS.md release/LICENSE release/*.dat release/SHA256SUMS --clobber

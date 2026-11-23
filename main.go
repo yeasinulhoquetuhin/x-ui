@@ -68,6 +68,8 @@ func runWebServer() {
 		log.Fatalf("Error starting sub server: %v", err)
 		return
 	}
+	stopSlowDNSRouting := service.StartSlowDNSRouting()
+	defer stopSlowDNSRouting()
 
 	sigCh := make(chan os.Signal, 1)
 	// Trap shutdown signals
@@ -465,6 +467,7 @@ func main() {
 		fmt.Println("    run            run web panel")
 		fmt.Println("    migrate        migrate form other/old x-ui")
 		fmt.Println("    setting        set settings")
+		fmt.Println("    slowdns        manage the native SlowDNS listener")
 	}
 
 	flag.Parse()
@@ -483,6 +486,11 @@ func main() {
 		runWebServer()
 	case "migrate":
 		migrateDb()
+	case "slowdns":
+		if err := service.RunSlowDNSCommand(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "setting":
 		err := settingCmd.Parse(os.Args[2:])
 		if err != nil {

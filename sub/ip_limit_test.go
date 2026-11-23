@@ -33,4 +33,8 @@ func TestSubscriptionIPLimitIsOptInAndCountsCanonicalIPs(t *testing.T) {
 	if full.Color != "red" || full.Count != "1" || full.Limit != "1" {
 		t.Fatalf("full slots must be red: %+v", full)
 	}
+	snapshot["shown"] = []xray.ClientIP{{Source: "slowdns", TunnelID: "one"}, {Source: "slowdns", TunnelID: "two", IP: "8.8.8.8"}, {IP: "fd53:1:2:3::4"}, {IP: "103.31.152.238"}}
+	if got := summarizeSubscriptionIPs(clients, snapshot, true); got.Count != "1" {
+		t.Fatalf("only ordinary source IPs may count: %+v", got)
+	}
 }

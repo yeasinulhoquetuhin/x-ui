@@ -102,6 +102,11 @@ func (a *SUBController) subs(c *gin.Context) {
 	if err != nil || len(subs) == 0 {
 		c.String(400, "Error!")
 	} else {
+		if c.Query("format") == "slowdns" {
+			c.Header("Cache-Control", "no-store")
+			c.JSON(200, a.subService.subscriptionSlowDNS(subId))
+			return
+		}
 		result := ""
 		for _, sub := range subs {
 			result += sub + "\n"
@@ -147,6 +152,7 @@ func (a *SUBController) subs(c *gin.Context) {
 				"ipCount":      ipLimit.Count,
 				"ipLimit":      ipLimit.Limit,
 				"ipLimitColor": ipLimit.Color,
+				"slowDNS":      a.subService.subscriptionSlowDNS(subId),
 				"used":         page.Used,
 				"remained":     page.Remained,
 				"expire":       page.Expire,

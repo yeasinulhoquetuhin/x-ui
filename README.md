@@ -1,6 +1,6 @@
-# TDZ X-UI
+# TDZ X-UI — Always Best
 
-A 3X-UI distribution with native IP limits, independent reseller accounts, scheduled client traffic resets, and TDZ payload acceptance on the inbound's own port.
+**A complete X-UI / 3X-UI control panel for Xray servers:** real-IP admission for ordinary connections, native encrypted SlowDNS, multi-inbound reseller management, scheduled traffic resets, and single-port TDZ payload acceptance.
 
 [![Latest release](https://img.shields.io/github/v/release/yeasinulhoquetuhin/x-ui?label=release&color=008771)](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest)
 [![License](https://img.shields.io/github/license/yeasinulhoquetuhin/x-ui)](LICENSE)
@@ -8,22 +8,26 @@ A 3X-UI distribution with native IP limits, independent reseller accounts, sched
 
 **Maintainer:** [Yeasinul Hoque Tuhin](https://github.com/yeasinulhoquetuhin)
 
-**Current release:** [`v2.9.3-patched.4`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.4) · **Base panel:** 3X-UI 2.9.3 · **Bundled Xray:** 26.4.25, `TDZ-IPLimit/2+Payload/3`
+**V5:** [`2.9.3-patched.5`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.5) · **Base:** 3X-UI 2.9.3 · **Xray:** 26.4.25
 
-## What's new in V4
+## Features
 
-| Feature | Behavior |
+| Capability | What you get |
 | --- | --- |
-| **Accept Payloads** | Original TDZ payload handshake on one inbound port; default off, above Proxy Protocol, with saved state across supported transport changes |
-| **Reseller management** | Admin account cards, search/status filters, inbound assignments, permission controls and a searchable activity log |
-| **Edit Password** | Per-reseller permission, default off; permitted resellers change their own password from the sidebar |
-| **Independent reseller URLs** | `/reseller/<path>/` works independently of the admin panel's base path |
-| **Client config labels** | Subscription, Telegram, copy/export and QR labels omit the inbound-name prefix |
-| **CLI fixes** | Options renumbered through 25; IP SSL setup from View Current Settings no longer opens a hidden nested menu |
+| **Real connection admission** | Ordinary authenticated connections are limited inside Xray, with atomic admission, live counts and stream-close cleanup |
+| **Native SlowDNS** | Stock-DNSTT-compatible encrypted streams inside Xray, using one shared UDP listener and the same inbound authentication/routing |
+| **Clear DNSTT policy** | DNSTT is unlimited by the IP-limit setting and excluded from IP counts/logs; ordinary connections to the same inbound still enforce their IP limit |
+| **One-port payload support** | TCP/RAW, WS, HTTPUpgrade, gRPC and TCP XHTTP can accept the original TDZ payload preface on their existing port |
+| **Independent resellers** | Multiple/shared inbound assignments, per-account edit/password permissions, scoped APIs and live session revocation |
+| **Flexible account cycles** | Traffic Reset schedules, total quota, expiry, delayed activation and all-time usage accounting |
+| **Client-ready sharing** | URI, JSON and Clash/Mihomo subscriptions, QR/copy actions, clean client labels and opt-in public connection hints |
+| **Persistent DNS keys** | Database-backed X25519 keys survive domain/MTU edits and SlowDNS uninstall/reinstall |
+| **SSH coexistence** | Separate-zone DNS routing allows TDZ SSH and X-UI to share public UDP 53 with independent internal listeners |
+| **Reproducible releases** | Pinned core/DNSTT sources, Linux/Windows packages, source archive, SHA256 checksums and multi-architecture Docker images |
 
-See the [V4 release notes](RELEASE_NOTES.md) and [changelog](CHANGELOG.md) for changes and upgrade details.
+[V4 → V5 changes](RELEASE_NOTES.md) · [Changelog](CHANGELOG.md) · [SlowDNS guide](SLOWDNS.md)
 
-[Install](#install-or-update) · [Downloads](#downloads) · [Accept Payloads](#accept-payloads) · [Resellers](#inbound-reseller-access) · [IP limits](#native-ip-limits) · [Traffic resets](#client-traffic-resets) · [Build](#building-from-source)
+[Install](#install-or-update) · [Support](#protocols-transports-and-security) · [SlowDNS](#slowdns-management) · [Downloads](#downloads) · [Accept Payloads](#accept-payloads) · [Resellers](#inbound-reseller-access) · [IP limits](#native-ip-limits) · [Build](#building-from-source)
 
 ## Install or update
 
@@ -35,38 +39,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master
 
 Without an argument, the installer selects the latest published package for your architecture. An in-place update preserves the database, panel credentials, base path, port, SSL configuration, service file, and local certificates. The application and database are backed up before migration; a failed migration restores the previous setup.
 
-### Choose a version
-
-Append `v4` to install this release explicitly. Historical `v0`–`v3` shortcuts remain available:
+To select V5 explicitly:
 
 ```bash
-# V4: single-port payloads and reseller management improvements
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v4
-
-# July 2026 archive
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v0
-
-# Previous native-IP-limit release
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v1
-
-# V2 per-inbound reseller release
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v2
-
-# V3 independent reseller accounts
-bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v3
+bash <(curl -Ls https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/install.sh) v5
 ```
 
-| Shortcut | Release | Contents |
-| --- | --- | --- |
-| `v0` | [`v2.9.3-patched.0`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.0) | Original July release; archived packages and source |
-| `v1` | [`v2.9.3-patched.1`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.1) | Former patched.3 release; preserved packages and source |
-| `v2` | [`v2.9.3-patched.2`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.2) | Former patched.5 feature set plus the final UI refinements |
-| `v3` | [`v2.9.3-patched.3`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.3) | Independent reseller accounts, multiple/shared inbound assignments and optional inbound editing |
-| `v4` | [`v2.9.3-patched.4`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.4) | Single-port TDZ payloads, reseller admin redesign/password permission, independent reseller paths, client labels and CLI fixes |
-
-Full release tags also work. If a version or architecture package is unavailable, the installer lists available releases before changing the installation. Enter `y` for the latest release, another version such as `v1`, or `n` to cancel.
-
-Archived packages retain their original embedded build versions. The release names above are the public version-selection scheme.
+Historical shortcuts `v0`–`v4` and full release tags also work. See [all releases](https://github.com/yeasinulhoquetuhin/x-ui/releases).
 
 ## Downloads
 
@@ -86,9 +65,81 @@ Each package contains the panel, matching patched Xray core, GeoIP/GeoSite data 
 
 Verify downloads against [`SHA256SUMS`](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest/download/SHA256SUMS). Historical releases contain the architectures available when those packages were built.
 
+## Protocols, transports and security
+
+| Inbound protocol / mode | Panel support | Native IP limits | SlowDNS option |
+| --- | --- | --- | --- |
+| **VLESS** | UUID, optional VLESS Encryption, Vision/fallback configuration | Authenticated client emails | NTLS on the five TCP transports below |
+| **VMess** | UUID and supported VMess security modes | Authenticated client emails | NTLS on the five TCP transports below |
+| **Trojan** | Password clients and fallback configuration | Authenticated client emails | NTLS on the five TCP transports below |
+| **Shadowsocks** | ChaCha20/XChaCha20 and Shadowsocks 2022 methods exposed by the panel | Email-accounted clients | TCP streams on the five transports below |
+| **Hysteria v1 / v2** | QUIC/UDP configuration and client authentication | Email-accounted clients with the bundled core | — |
+| **WireGuard** | WireGuard peers and connection configuration | Peer keys; no email-based IP-admission editor | — |
+| **Mixed / SOCKS** | SOCKS-compatible proxy mode | No panel multi-client IP-admission editor | — |
+| **HTTP proxy** | HTTP proxy configuration | No panel multi-client IP-admission editor | — |
+| **Tunnel / Dokodemo-door** | TCP/UDP forwarding and redirect configuration | No authenticated client identity | — |
+| **TUN** | TUN interface configuration | Interface traffic, not per-client proxy accounts | — |
+
+| Transport | Ordinary inbound use | Accept Payloads | SlowDNS |
+| --- | --- | --- | --- |
+| **TCP / RAW** | Native TCP stream; optional HTTP camouflage | Yes | NTLS |
+| **WebSocket** | Matching path/Host and WS handshake | Yes | NTLS |
+| **HTTPUpgrade** | Matching HTTP upgrade configuration | Yes | NTLS |
+| **gRPC** | HTTP/2, matching service name/authority | Yes | NTLS |
+| **XHTTP** | Supported TCP modes: auto, packet-up, stream-up, stream-one | TCP only | NTLS over TCP |
+| **mKCP** | UDP-based transport | — | — |
+| **Hysteria / QUIC** | UDP/QUIC with its required transport security | — | — |
+| **XHTTP over HTTP/3** | QUIC-capable client and configuration | — | — |
+
+Transport choices depend on the selected protocol. The panel controls the supported combinations; clients need matching protocol, transport and security settings.
+
+### TLS, REALITY, Vision and ALPN
+
+- **TLS:** server certificates, SNI, supported TLS-version/cipher controls, fingerprints, certificate pinning and exposed ECH options.
+- **REALITY:** exposed for compatible VLESS/Trojan configurations on TCP, gRPC or XHTTP; matching target/server name, public key and short ID are required.
+- **XTLS Vision:** VLESS on compatible TLS/REALITY TCP configuration. SlowDNS uses NTLS and does not enable a Vision flow.
+- **NTLS / `security: none`:** no inner TLS. SlowDNS still encrypts/authenticates its outer DNSTT tunnel using Noise/X25519.
+
+| ALPN | Purpose | Typical configuration |
+| --- | --- | --- |
+| `http/1.1` | HTTP/1.1 negotiation | TLS WebSocket / HTTPUpgrade |
+| `h2` | HTTP/2 negotiation | TLS gRPC and TCP-based XHTTP |
+| `h3` | HTTP/3 over QUIC | Hysteria / QUIC-capable XHTTP |
+
+ALPN is TLS application-protocol negotiation. NTLS SlowDNS has no inner TLS ALPN, and choosing `h3` does not turn a TCP transport into QUIC. See the [official TLS reference](https://xtls.github.io/en/config/transports/tls.html).
+
+### Outbounds and routing
+
+The outbound editor exposes **Freedom/direct, Blackhole/block, DNS, VLESS, VMess, Trojan, Shadowsocks, SOCKS, HTTP, WireGuard and Hysteria**. Routing includes domain/IP/GeoIP/GeoSite rules, sniffing, DNS/FakeDNS, outbound chaining and supported balancer controls. Panel subscriptions support URI, JSON and Clash/Mihomo output with client-app compatibility requirements.
+
+## SlowDNS Management
+
+Open **`x-ui → 23. SlowDNS Management`** or run `x-ui slowdns`:
+
+1. Choose **Install / Set up**.
+2. Enter a **Host domain** for the nameserver, e.g. `ns.example.com`, with an A/AAAA record pointing to the listening VPS.
+3. Enter the delegated **NS domain / tunnel zone**, e.g. `xui.example.com`; create `NS xui.example.com → ns.example.com`.
+4. Press Enter for MTU **1232**, the upstream DNSTT default selected to avoid common IPv6 fragmentation. A custom **512–4096** value is accepted; `512` helps resolvers with smaller DNS response limits.
+5. Enable **SlowDNS** on a supported NTLS inbound. The option starts off, and TLS/REALITY hides and disables it.
+
+Every DNS-enabled inbound uses the same client NS domain: **`xui.example.com`**. Transport framing and distinct protocol credentials select the inbound without an `i<inbound-id>.` prefix. Several inbounds share one public UDP **53** entry. Linux uses an internal **5301/UDP** listener by default, separate from TDZ SSH's **54/UDP** listener.
+
+**More Information** shows a bottom SlowDNS card containing **NameServer** and **Public Key**, both clickable to copy. Enable **Show SlowDNS on Subscription Page** per client to display the same fields **below client configs**. It defaults to off. Google and Cloudflare resolvers are accepted without displaying resolver fields. Standard URI/JSON/Clash profiles keep their ordinary formats; a DNSTT-compatible client uses these hints and the existing protocol credentials. CLI **23 → 3** keeps its details page open until **0** returns to the main menu.
+
+**DNSTT is unlimited by the IP-limit setting and excluded from IP Log/subscription IP counts.** Ordinary connections to the same inbound still enforce their real-IP limit. Protocol authentication, quota and account policies apply to DNS traffic.
+
+### Stable keys and TDZ SSH coexistence
+
+- Domains, MTU and listener edits keep the database keypair. SlowDNS uninstall disables inbound opt-ins and retains keys; reinstall keeps the public key.
+- Only **Regenerate / Revoke public key** explicitly creates a replacement keypair. Back up the panel database to preserve keys across a complete panel/database reinstall.
+- Give TDZ SSH and X-UI **separate sibling tunnel zones**, such as `ssh.example.com` and `xui.example.com`. The nameserver host can be shared.
+- Domain-specific, earlier-priority DNS routing selects X-UI while TDZ SSH keeps its own default DNS forwarding. Starting/stopping/reinstalling the SSH forwarding component does not override the X-UI zone.
+
+See [SLOWDNS.md](SLOWDNS.md) for command-line examples, DNS records, client setup and coexistence details.
+
 ## Inbound reseller access
 
-Create and manage independent accounts from **Reseller** in the administrator sidebar, directly below Inbounds and above Xray Configs:
+Create accounts from **Reseller** in the administrator sidebar:
 
 1. Select **Create Reseller** and choose a **Path ID**, username, and password.
 2. Select any number of inbounds in the searchable **Assigned Inbounds** picker, or leave it empty.
@@ -103,21 +154,10 @@ https://panel.example.com:2053/reseller/shop-one/
 
 The reseller can create, edit, enable, disable, delete, and reset clients within assigned multi-client inbounds. Bulk creation, usage statistics, connection links, QR codes, subscriptions, Traffic Reset, and subscription IP-limit visibility are included. There is no reseller client-count cap.
 
-Each account can have multiple inbounds, and the same inbound can belong to multiple resellers. Sharing an inbound shares its full client list and usage: a client change by one reseller is visible to the others assigned to it. The dashboard's **Total Inbounds** counts only assigned inbounds. An enabled account with no assignments can log in and sees **No inbounds assigned yet.** Assignment changes appear in the open dashboard automatically.
-
-**Edit Inbounds** defaults to off. When enabled, the reseller can edit configuration and enable/disable assigned inbounds, including access to configuration secrets needed for editing. Inbound edits preserve the latest clients and traffic counters, so a stale editor does not overwrite another reseller's client changes. Inbound creation/deletion, unassigned inbounds, panel settings, server controls and backups remain administrator-only. API checks and separate live-update streams enforce these boundaries.
-
-**Edit Password** also defaults to off. Enable it per account to show Change Password in the reseller sidebar. Password changes verify the current password, revoke existing sessions and appear in the administrator's activity log. Administrators manage accounts with responsive cards, search, status filters and assignment/permission controls. Reseller portals are at `/reseller/<path>/`, independent of the panel base path; their original dashboard layout is retained and the panel TLS warning is hidden.
-
-Client config labels omit the inbound-name prefix in subscription URI/JSON/Clash output, Telegram-delivered links, and panel copy/QR/export actions, including when an existing installation still has the old remark pattern.
-
-Changing the reseller username, password, or Path ID, disabling the account, or deleting it invalidates previous sessions, including open live-update connections. Permission/assignment changes take effect without requiring a new login. Deleting an inbound removes its assignments and keeps reseller accounts available. Recent actions, including the affected inbound number, are available from the account's activity button.
-
-Existing V2 per-inbound accounts migrate automatically: Path IDs, usernames, password hashes and activity history are preserved, the original inbound becomes an assignment, and inbound editing stays off. Migration runs once and does not recreate deleted accounts or removed assignments on subsequent restarts. On V4, distribute the new `/reseller/<path>/` login URL and sign in again; the previous panel-prefixed reseller URL is replaced.
-
-Path IDs and credentials have no arbitrary minimum-length rule. The path must remain a valid, non-empty URL segment and must not conflict with reserved panel routes. Passwords are hashed; an empty password field when editing keeps the existing password.
-
-Client authentication is inbound-scoped: separate inbounds may use the same protocol UUID/password. Client emails/names stay unique for separate traffic accounting. A subscription shared across multiple inbounds requires all those inbounds to be assigned to the account; new clients cannot join another client's subscription. Conflicts identify the inbound when saving assignments.
+- Multiple/shared inbound assignments are supported. Sharing an inbound shares its client list and traffic visibility.
+- **Edit Inbounds** enables editing assigned inbound configurations; panel/server controls stay administrator-only.
+- **Edit Password** exposes the reseller password-change page. Credential changes, disabling or deletion revoke existing sessions.
+- Client labels omit the inbound-name prefix in subscriptions, Telegram links, copy/QR and exports.
 
 ## Native IP limits
 
@@ -129,11 +169,9 @@ IP admission is enforced inside the bundled Xray core before an authenticated st
 - Client IP details show the core's current connection snapshot. Open the details or use **Refresh** to update it; no automatic IP-log polling is enabled.
 - **Clear** removes the stored/displayed IP records without fetching another snapshot. Connected IPs appear again when you explicitly refresh or reopen the details.
 
-IP limits count source addresses, not physical devices. Devices sharing one public IP occupy one IP slot. Limited accounts reject unresolved local/private relay addresses rather than silently treating all proxied clients as one IP.
+Direct IP limits count source addresses, not physical devices. Devices sharing one public IP occupy one IP slot. Native DNSTT is excluded from IP admission/statistics. Unresolved local/private addresses from ordinary relays are rejected for limited accounts.
 
-The bundled payload proxy preserves real IPs through a private, live-socket-validated channel without changing payload or relay bytes. Other reverse proxies must forward the actual client address through configured trusted headers or PROXY protocol. For HTTP proxy headers, configure exact trusted peer IPs/CIDRs with `TDZ_XRAY_TRUSTED_PROXIES` in the panel service environment.
-
-The default access-log path is `./access.log`. Native admission and live IP reporting do not depend on access logging or Fail2ban.
+Reverse proxies must forward the actual client address through trusted headers or PROXY protocol. For HTTP headers, configure trusted peer IPs/CIDRs with `TDZ_XRAY_TRUSTED_PROXIES`. Native IP enforcement does not depend on access-log scanning or Fail2ban.
 
 ### Show IP usage on subscriptions
 
@@ -145,7 +183,7 @@ Enable **Show IP Limit on Subscription Page** in the admin or reseller client ed
 | `1/1` or `2/2` — red | Limit full |
 | `Unavailable/2` — orange | Live statistics could not be read |
 
-The setting is per client and defaults to off. Actual IP addresses are not exposed on the subscription page. Reload the page to request a fresh count.
+The setting is per client and defaults to off. Actual IP addresses are not exposed on the subscription page. Reload the page to request a fresh count. DNSTT-only traffic shows **0** ordinary IP slots, even when the account's limit is 1.
 
 ## Client traffic resets
 
@@ -165,9 +203,9 @@ Enable **Accept Payloads** for TCP/RAW, WS, HTTPUpgrade, gRPC or XHTTP over TCP 
 Client → inbound port → payload → fixed TDZ 101 → configured transport → Xray authentication
 ```
 
-With the switch **ON**, the initial payload is required. GET, POST, CONNECT and custom header content use the same response; this is the original TDZ relay behavior. For a WS inbound, the real WS handshake follows that response. For TLS, the payload comes before TLS. UDP-based KCP, Hysteria and QUIC/HTTP3 do not support this option. Client apps must expand payload macros and use the matching transport and authentication.
+With the switch **ON**, payload-aware clients can send the initial payload; GET, POST, CONNECT and custom prefaces use the same fixed TDZ response. Native binary/TLS, HTTP/2 and matching HTTP transport handshakes are detected and replayed intact. For a payload-prefaced WS connection, the real WS handshake follows the TDZ response; a payload-prefaced TLS connection sends the payload before TLS. UDP-based KCP, Hysteria and QUIC/HTTP3 do not support this option. Client apps must expand payload macros and use the matching transport and authentication.
 
-Existing two-port proxies are still managed with `x-ui-proxy`. The main CLI's Payload / Proxy entry has been removed, and the remaining choices now run from 0 to 25. **9. View Current Settings** can request an IP certificate without opening a hidden nested menu; failures or cancellation restore a previously running panel.
+Existing two-port proxies are still managed with `x-ui-proxy`. Main CLI choices run from **0 to 26**, with **23 SlowDNS**, **24 BBR**, **25 Geo Files** and **26 Speedtest**. **9. View Current Settings** can request an IP certificate without opening a hidden nested menu; failures or cancellation restore a previously running panel.
 
 Menu **1. Install** and **2. Update** use this repository's installer. **3. Update Menu** updates only the CLI menu scripts.
 
@@ -180,22 +218,7 @@ go build -o x-ui main.go
 bash build_xray.sh ./bin/xray-linux-amd64
 ```
 
-The core is pinned to Xray `v26.4.25`, revision `b4f08981becb71eaa995fa98ed2098ade92566bb`, and identifies itself as `TDZ-IPLimit/2+Payload/3`. `build_xray.sh` uses the bundled, checksum-verified source archive. The original Go module namespace is retained for local source compatibility.
-
-For cross-compilation, set `GOOS`, `GOARCH`, `GOARM` where applicable, and an appropriate CGO `CC`. ARM panel builds set `xray.armVariant` to `armv5`, `armv6`, or `armv7` for architecture-correct core updates. See [the release workflow](.github/workflows/release.yml) for platform configuration.
-
-For Docker, the release workflow publishes `linux/amd64` and `linux/arm64` images to `ghcr.io/yeasinulhoquetuhin/x-ui`.
-
-## Verification
-
-- Go unit/integration tests, race detection, `go vet`, and static analysis.
-- Installer data preservation, migration rollback, version selection, and menu-only updates.
-- Browser checks for reseller login, scoped client management, copy feedback, session revocation, Traffic Reset details, and subscription IP tags.
-- Real multi-source connection tests across supported VLESS, VMess, Trojan, and Shadowsocks transport cases, including MUX and the local payload proxy.
-- Byte-for-byte comparison with the original TDZ Python proxy, including split/coalesced headers and unchanged post-header data; real payload traffic with supported transports, TLS and live API updates.
-- Architecture build/version checks and published-asset checksums.
-
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for release-specific changes and [resources/README.md](resources/README.md) for bundled-data provenance.
+See [the release workflow](.github/workflows/release.yml) for cross-compilation and [resources/README.md](resources/README.md) for bundled-data provenance. Docker images support `linux/amd64` and `linux/arm64` at `ghcr.io/yeasinulhoquetuhin/x-ui`.
 
 ## Credits and license
 

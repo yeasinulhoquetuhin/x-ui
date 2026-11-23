@@ -40,6 +40,25 @@ update_menu() {''' + function + '\nupdate_menu\n'
         menu = source.split('show_menu() {', 1)[1]
         self.assertNotIn('Payload / Proxy', menu)
         self.assertIn('${green}4.${plain} Uninstall', menu)
-        self.assertIn('${green}25.${plain} Speedtest by Ookla', menu)
-        self.assertNotIn('${green}26.', menu)
+        self.assertIn('${green}23.${plain} SlowDNS Management', menu)
+        self.assertIn('${green}24.${plain} Enable BBR', menu)
+        self.assertIn('${green}25.${plain} Update Geo Files', menu)
+        self.assertIn('${green}26.${plain} Speedtest by Ookla', menu)
         self.assertNotIn('${green}4.${plain} Legacy Version', menu)
+
+    def test_slowdns_details_waits_for_zero_without_reopening_submenu(self):
+        source = (ROOT / 'x-ui.sh').read_text()
+        functions = source.split('slowdns_details() {', 1)[1].split('\nshow_menu() {', 1)[0]
+        functions = ('slowdns_details() {' + functions).replace('/usr/local/x-ui/x-ui', 'mock_panel')
+        script = '''
+check_install() { return 0; }
+LOGE() { printf '%s\n' "$*"; }
+show_menu() { printf 'MAIN-MENU\n'; }
+mock_panel() { printf 'SLOWDNS-DETAILS\n'; }
+''' + functions + '\nslowdns_main\n'
+        result = subprocess.run(['bash', '-c', script], input='3\n9\n0\n',
+                                text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.count('SlowDNS Management'), 1)
+        self.assertEqual(result.stdout.count('SLOWDNS-DETAILS'), 1)
+        self.assertEqual(result.stdout.count('MAIN-MENU'), 1)

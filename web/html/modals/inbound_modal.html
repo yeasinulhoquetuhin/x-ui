@@ -53,6 +53,7 @@
             this.confirm = confirm;
             this.visible = true;
             this.isEdit = isEdit;
+            if (typeof app.getDefaultSettings === 'function') app.getDefaultSettings();
         },
         close() {
             inModal.visible = false;
@@ -162,6 +163,7 @@
         },
         watch: {
             "inModal.inbound.stream.security"(newVal, oldVal) {
+                if (newVal !== 'none') inModal.inbound.stream.slowDNS = false;
                 // Clear flow when security changes from reality/tls to none
                 if (
                     inModal.inbound.protocol == Protocols.VLESS &&
@@ -200,6 +202,7 @@
         },
         methods: {
             streamNetworkChange() {
+                if (!inModal.inbound.canEnableSlowDNS()) inModal.inbound.stream.slowDNS = false;
                 if (inModal.inbound.stream.acceptPayloads && inModal.inbound.stream.network === 'tcp') {
                     inModal.inbound.stream.tcp.type = 'none';
                 }

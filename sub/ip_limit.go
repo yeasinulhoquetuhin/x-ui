@@ -2,6 +2,7 @@ package sub
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/mhsanaei/3x-ui/v2/database/model"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
@@ -50,7 +51,10 @@ func summarizeSubscriptionIPs(clients map[string]int, snapshot map[string][]xray
 		}
 		unique := make(map[string]bool)
 		for _, record := range snapshot[email] {
-			if ip, ok := xray.NormalizeClientIP(record.IP); ok {
+			if record.Source == "slowdns" {
+				continue
+			}
+			if ip, ok := xray.NormalizeClientIP(record.IP); ok && !strings.HasPrefix(ip, "fd53:") {
 				unique[ip] = true
 			}
 		}

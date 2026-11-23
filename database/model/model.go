@@ -104,7 +104,7 @@ func (i *Inbound) GenXrayInboundConfig() *xray.InboundConfig {
 		Port:           i.Port,
 		Protocol:       string(i.Protocol),
 		Settings:       json_util.RawMessage(i.Settings),
-		StreamSettings: json_util.RawMessage(i.StreamSettings),
+		StreamSettings: json_util.RawMessage(xray.StripSlowDNSSettings(i.StreamSettings)),
 		Tag:            i.Tag,
 		Sniffing:       json_util.RawMessage(i.Sniffing),
 	}
@@ -148,6 +148,7 @@ type Client struct {
 	TrafficReset     string `json:"trafficReset"`                 // never/hourly/12hourly/daily/weekly/monthly/custom; independent of expiry
 	TrafficResetDays int    `json:"trafficResetDays"`
 	ShowIPLimit      bool   `json:"showIpLimit"`          // Display active/maximum IP slots on the subscription web page
+	ShowSlowDNS      bool   `json:"showSlowDNS"`          // Opt in to public SlowDNS details on the subscription web page
 	CreatedAt        int64  `json:"created_at,omitempty"` // Creation timestamp
 	UpdatedAt        int64  `json:"updated_at,omitempty"` // Last update timestamp
 }

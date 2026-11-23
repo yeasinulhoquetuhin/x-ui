@@ -43,6 +43,7 @@ func initModels() error {
 		&model.ResellerAccount{},
 		&model.ResellerInbound{},
 		&model.ResellerAudit{},
+		&model.SlowDNSConfig{},
 	}
 	for _, model := range models {
 		if err := db.AutoMigrate(model); err != nil {

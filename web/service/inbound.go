@@ -228,6 +228,11 @@ func (s *InboundService) checkEmailExistForInbound(inbound *model.Inbound) (stri
 // then saves the inbound to the database and optionally adds it to the running Xray instance.
 // Returns the created inbound, whether Xray needs restart, and any error.
 func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
+	clientTrafficMu.Lock()
+	defer clientTrafficMu.Unlock()
+	if err := validateInboundSlowDNS(inbound); err != nil {
+		return inbound, false, err
+	}
 	if _, err := xray.InjectPayloadEnabled([]byte(inbound.StreamSettings)); err != nil {
 		return inbound, false, err
 	}
@@ -298,25 +303,33 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 		}
 	}
 
-	db := database.GetDB()
-	tx := db.Begin()
-	defer func() {
-		if err == nil {
-			tx.Commit()
-		} else {
-			tx.Rollback()
+	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(inbound).Error; err != nil {
+			return err
 		}
-	}()
-
-	err = tx.Save(inbound).Error
-	if err == nil {
 		if len(inbound.ClientStats) == 0 {
 			for _, client := range clients {
-				s.AddClientStat(tx, inbound.Id, &client)
+				if err := s.AddClientStat(tx, inbound.Id, &client); err != nil {
+					return err
+				}
 			}
 		}
-	} else {
+		return nil
+	})
+	if err != nil {
 		return inbound, false, err
+	}
+	if err := WriteClientIPLimits(); err != nil {
+		return inbound, true, err
+	}
+	if err := WriteSlowDNSRuntimeConfig(); err != nil {
+		return inbound, true, err
+	}
+	if err := SyncSlowDNSRouting(); err != nil {
+		return inbound, true, err
+	}
+	if p == nil {
+		return inbound, inbound.Enable, nil
 	}
 
 	needRestart := false
@@ -389,6 +402,12 @@ func (s *InboundService) DelInbound(id int) (bool, error) {
 		}
 		return tx.Delete(model.Inbound{}, id).Error
 	})
+	if err == nil {
+		err = WriteSlowDNSRuntimeConfig()
+		if err == nil {
+			err = SyncSlowDNSRouting()
+		}
+	}
 	return needRestart, err
 }
 
@@ -413,6 +432,9 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 
 // Callers already holding clientTrafficMu (reseller edits) use this helper.
 func (s *InboundService) updateInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
+	if err := validateInboundSlowDNS(inbound); err != nil {
+		return inbound, false, err
+	}
 	if _, err := xray.InjectPayloadEnabled([]byte(inbound.StreamSettings)); err != nil {
 		return inbound, false, err
 	}
@@ -533,6 +555,15 @@ func (s *InboundService) updateInbound(inbound *model.Inbound) (*model.Inbound, 
 	}
 	if p == nil {
 		return oldInbound, true, nil
+	}
+	if err := WriteClientIPLimits(); err != nil {
+		return oldInbound, true, err
+	}
+	if err := WriteSlowDNSRuntimeConfig(); err != nil {
+		return oldInbound, true, err
+	}
+	if err := SyncSlowDNSRouting(); err != nil {
+		return oldInbound, true, err
 	}
 	if err := s.xrayApi.Init(p.GetAPIPort()); err != nil {
 		return oldInbound, true, nil

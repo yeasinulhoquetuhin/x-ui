@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/mhsanaei/3x-ui/v2/database/model"
 	"github.com/mhsanaei/3x-ui/v2/web/service"
 	"github.com/mhsanaei/3x-ui/v2/web/session"
 	"github.com/mhsanaei/3x-ui/v2/web/websocket"
+	"github.com/mhsanaei/3x-ui/v2/xray"
 
 	"github.com/gin-gonic/gin"
 )
@@ -210,27 +210,11 @@ func (a *InboundController) getClientIps(c *gin.Context) {
 		return
 	}
 
-	// Prefer returning a normalized string list for consistent UI rendering
-	type ipWithTimestamp struct {
-		IP        string `json:"ip"`
-		Timestamp int64  `json:"timestamp"`
-	}
-
-	var ipsWithTime []ipWithTimestamp
-	if err := json.Unmarshal([]byte(ips), &ipsWithTime); err == nil && len(ipsWithTime) > 0 {
-		formatted := make([]string, 0, len(ipsWithTime))
-		for _, item := range ipsWithTime {
-			if item.IP == "" {
-				continue
-			}
-			if item.Timestamp > 0 {
-				ts := time.Unix(item.Timestamp, 0).Local().Format("2006-01-02 15:04:05")
-				formatted = append(formatted, fmt.Sprintf("%s (%s)", item.IP, ts))
-				continue
-			}
-			formatted = append(formatted, item.IP)
-		}
-		jsonObj(c, formatted, nil)
+	// Retain source type and tunnel identity. DNS sessions have no public IP;
+	// dropping empty IP fields here used to hide active sessions and their count.
+	var records []xray.ClientIP
+	if err := json.Unmarshal([]byte(ips), &records); err == nil && len(records) > 0 {
+		jsonObj(c, records, nil)
 		return
 	}
 

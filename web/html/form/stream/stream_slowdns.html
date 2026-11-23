@@ -1,0 +1,6 @@
+{{define "form/streamSlowDNS"}}
+<a-form-item v-if="app.slowDNS.installed && inbound.canEnableSlowDNS()" label="SlowDNS">
+  <a-switch v-model="inbound.stream.slowDNS" :disabled="!app.slowDNS.enabled"></a-switch>
+  <span v-if="!app.slowDNS.enabled" style="margin-left:8px;opacity:.7">Start using x-ui menu 23</span>
+</a-form-item>
+{{end}}

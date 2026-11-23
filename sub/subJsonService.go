@@ -239,6 +239,7 @@ func (s *SubJsonService) streamData(stream string) map[string]any {
 	}
 	delete(streamSettings, "sockopt")
 	delete(streamSettings, "acceptPayloads")
+	delete(streamSettings, "slowDNS")
 
 	if s.fragmentOrNoises {
 		streamSettings["sockopt"] = json_util.RawMessage(`{"dialerProxy": "direct_out", "tcpKeepAliveIdle": 100}`)

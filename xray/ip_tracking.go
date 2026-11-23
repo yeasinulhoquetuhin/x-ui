@@ -16,8 +16,25 @@ import (
 
 // ClientIP represents a currently open connection, not an access-log history.
 type ClientIP struct {
-	IP        string `json:"ip"`
+	IP        string `json:"ip,omitempty"`
 	Timestamp int64  `json:"timestamp"`
+	Source    string `json:"source,omitempty"`
+	TunnelID  string `json:"tunnelId,omitempty"`
+}
+
+func clientSourceRecord(raw string, seen int64) (ClientIP, string, bool) {
+	if strings.HasPrefix(raw, "slowdns|") {
+		return ClientIP{}, "", false
+	}
+	ip, ok := NormalizeClientIP(raw)
+	if !ok {
+		return ClientIP{}, "", false
+	}
+	// DNSTT identifiers from older cores are excluded from IP logs/counts too.
+	if strings.HasPrefix(ip, "fd53:") {
+		return ClientIP{}, "", false
+	}
+	return ClientIP{IP: ip, Timestamp: seen}, ip, true
 }
 
 func NormalizeClientIP(raw string) (string, bool) {
@@ -61,18 +78,24 @@ func (x *XrayAPI) GetOnlineClientIPs() (map[string][]ClientIP, error) {
 		if err != nil {
 			return nil, fmt.Errorf("query IPs for %s: %w", email, err)
 		}
-		unique := make(map[string]int64)
+		unique := make(map[string]ClientIP)
 		for raw, seen := range response.Ips {
-			if ip, ok := NormalizeClientIP(raw); ok {
-				if previous, exists := unique[ip]; !exists || seen > previous {
-					unique[ip] = seen
+			if record, key, ok := clientSourceRecord(raw, seen); ok {
+				if previous, exists := unique[key]; !exists || seen > previous.Timestamp {
+					unique[key] = record
 				}
 			}
 		}
-		for ip, seen := range unique {
-			result[email] = append(result[email], ClientIP{IP: ip, Timestamp: seen})
+		for _, record := range unique {
+			result[email] = append(result[email], record)
 		}
-		sort.Slice(result[email], func(i, j int) bool { return result[email][i].IP < result[email][j].IP })
+		sort.Slice(result[email], func(i, j int) bool {
+			a, b := result[email][i], result[email][j]
+			if a.IP != b.IP {
+				return a.IP < b.IP
+			}
+			return a.TunnelID < b.TunnelID
+		})
 	}
 	return result, nil
 }

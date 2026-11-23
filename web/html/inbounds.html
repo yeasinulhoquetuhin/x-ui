@@ -1132,6 +1132,7 @@
       tgBotEnable: false,
       showAlert: false,
       ipLimitEnable: false,
+      slowDNS: { installed: false, enabled: false },
       pageSize: 0,
     },
     methods: {
@@ -1188,6 +1189,7 @@
         this.remarkModel = settings.remarkModel;
         this.datepicker = settings.datepicker;
         this.ipLimitEnable = settings.ipLimitEnable;
+        this.slowDNS = settings.slowDNS || { installed: false, enabled: false };
         if (this.isReseller) {
           this.canEditInbounds = !!settings.canEditInbounds;
           this.canEditPassword = !!settings.canEditPassword;

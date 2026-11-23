@@ -36,6 +36,7 @@
             }
         },
         show({ title = '', okText = '{{ i18n "sure" }}', index = null, dbInbound = null, confirm = () => { }, isEdit = false }) {
+            if (typeof app.getDefaultSettings === 'function') app.getDefaultSettings();
             this.visible = true;
             this.title = title;
             this.okText = okText;

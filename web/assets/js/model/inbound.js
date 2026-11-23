@@ -1343,6 +1343,7 @@ class StreamSettings extends XrayCommonClass {
         finalmask = new FinalMaskStreamSettings(),
         sockopt = undefined,
         acceptPayloads = false,
+        slowDNS = false,
     ) {
         super();
         this.network = network;
@@ -1360,6 +1361,7 @@ class StreamSettings extends XrayCommonClass {
         this.finalmask = finalmask;
         this.sockopt = sockopt;
         this.acceptPayloads = acceptPayloads;
+        this.slowDNS = !!slowDNS;
     }
 
     addTcpMask(type = 'fragment') {
@@ -1439,6 +1441,7 @@ class StreamSettings extends XrayCommonClass {
             FinalMaskStreamSettings.fromJson(json.finalmask),
             SockoptStreamSettings.fromJson(json.sockopt),
             json.acceptPayloads ?? json.tcpSettings?.injectPayload ?? json.rawSettings?.injectPayload ?? false,
+            json.slowDNS,
         );
     }
 
@@ -1447,6 +1450,7 @@ class StreamSettings extends XrayCommonClass {
         return {
             network: network,
             acceptPayloads: ['tcp','raw','ws','websocket','grpc','httpupgrade','xhttp','splithttp'].includes(network) ? this.acceptPayloads : undefined,
+            slowDNS: ['tcp','raw','ws','websocket','grpc','httpupgrade','xhttp','splithttp'].includes(network) && this.security === 'none' ? this.slowDNS : undefined,
             security: this.security,
             externalProxy: this.externalProxy,
             tlsSettings: this.isTls ? this.tls.toJson() : undefined,
@@ -1763,6 +1767,13 @@ class Inbound extends XrayCommonClass {
         if (this.protocol === Protocols.HYSTERIA) return true;
         if (![Protocols.VMESS, Protocols.VLESS, Protocols.TROJAN, Protocols.SHADOWSOCKS].includes(this.protocol)) return false;
         return ["tcp", "ws", "http", "grpc", "httpupgrade", "xhttp"].includes(this.network);
+    }
+
+    canEnableSlowDNS() {
+        return [Protocols.VMESS, Protocols.VLESS, Protocols.TROJAN, Protocols.SHADOWSOCKS].includes(this.protocol)
+            && this.stream.security === 'none'
+            && ['tcp', 'raw', 'ws', 'websocket', 'grpc', 'httpupgrade', 'xhttp', 'splithttp'].includes(this.stream.network)
+            && !String(this.listen || '').startsWith('@');
     }
 
     //this is used for xtls-rprx-vision
@@ -2407,6 +2418,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
         trafficReset = 'never',
         trafficResetDays = 0,
         showIpLimit = false,
+        showSlowDNS = false,
     ) {
         super();
         this.email = email;
@@ -2423,6 +2435,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
         this.trafficReset = trafficReset || 'never';
         this.trafficResetDays = trafficResetDays || 0;
         this.showIpLimit = !!showIpLimit;
+        this.showSlowDNS = !!showSlowDNS;
     }
 
     static commonArgsFromJson(json = {}) {
@@ -2441,6 +2454,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
             json.trafficReset,
             json.trafficResetDays,
             json.showIpLimit,
+            json.showSlowDNS,
         ];
     }
 
@@ -2460,6 +2474,7 @@ Inbound.ClientBase = class extends XrayCommonClass {
             trafficReset: this.trafficReset,
             trafficResetDays: this.trafficResetDays,
             showIpLimit: this.showIpLimit,
+            showSlowDNS: this.showSlowDNS,
         };
     }
 
@@ -2534,9 +2549,9 @@ Inbound.VmessSettings.VMESS = class extends Inbound.ClientBase {
         id = RandomUtil.randomUUID(),
         security = USERS_SECURITY.AUTO,
         email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at,
-        trafficReset, trafficResetDays, showIpLimit,
+        trafficReset, trafficResetDays, showIpLimit, showSlowDNS,
     ) {
-        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit);
+        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit, showSlowDNS);
         this.id = id;
         this.security = security;
     }
@@ -2640,9 +2655,9 @@ Inbound.VLESSSettings.VLESS = class extends Inbound.ClientBase {
         id = RandomUtil.randomUUID(),
         flow = '',
         email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at,
-        trafficReset, trafficResetDays, showIpLimit,
+        trafficReset, trafficResetDays, showIpLimit, showSlowDNS,
     ) {
-        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit);
+        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit, showSlowDNS);
         this.id = id;
         this.flow = flow;
     }
@@ -2739,9 +2754,9 @@ Inbound.TrojanSettings.Trojan = class extends Inbound.ClientBase {
     constructor(
         password = RandomUtil.randomSeq(10),
         email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at,
-        trafficReset, trafficResetDays, showIpLimit,
+        trafficReset, trafficResetDays, showIpLimit, showSlowDNS,
     ) {
-        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit);
+        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit, showSlowDNS);
         this.password = password;
     }
 
@@ -2842,9 +2857,9 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends Inbound.ClientBase {
         method = '',
         password = RandomUtil.randomShadowsocksPassword(),
         email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at,
-        trafficReset, trafficResetDays, showIpLimit,
+        trafficReset, trafficResetDays, showIpLimit, showSlowDNS,
     ) {
-        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit);
+        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit, showSlowDNS);
         this.method = method;
         this.password = password;
     }
@@ -2893,9 +2908,9 @@ Inbound.HysteriaSettings.Hysteria = class extends Inbound.ClientBase {
     constructor(
         auth = RandomUtil.randomSeq(10),
         email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at,
-        trafficReset, trafficResetDays, showIpLimit,
+        trafficReset, trafficResetDays, showIpLimit, showSlowDNS,
     ) {
-        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit);
+        super(email, limitIp, totalGB, expiryTime, enable, tgId, subId, comment, reset, created_at, updated_at, trafficReset, trafficResetDays, showIpLimit, showSlowDNS);
         this.auth = auth;
     }
 

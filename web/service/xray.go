@@ -199,6 +199,9 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 	if err := WriteClientIPLimits(); err != nil {
 		return nil, err
 	}
+	if err := WriteSlowDNSRuntimeConfig(); err != nil {
+		return nil, err
+	}
 	return xrayConfig, nil
 }
 
@@ -245,6 +248,13 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			return errors.New(result)
 		}
 	}
+	var slowDNSService SlowDNSService
+	if cfg, err := slowDNSService.GetConfig(); err != nil {
+		return err
+	} else if cfg.Installed && cfg.Enabled && !xray.NativeSlowDNSAvailable() {
+		result = "SlowDNS requires the matching TDZ SlowDNS/1 core"
+		return errors.New(result)
+	}
 	if !xray.NativeIPLimitAvailable() {
 		raw, err := os.ReadFile(xray.GetIPLimitConfigPath())
 		if err != nil {
@@ -271,6 +281,12 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			logger.Debug("It does not need to restart Xray")
 			return nil
 		}
+	}
+	if err := SyncSlowDNSRouting(); err != nil {
+		result = err.Error()
+		return err
+	}
+	if s.IsXrayRunning() {
 		p.Stop()
 	}
 

@@ -6,6 +6,7 @@ import sys
 import tarfile
 import hashlib
 import subprocess
+import re
 
 root = pathlib.Path(sys.argv[1])
 assets = pathlib.Path(__file__).parent / 'testdata'
@@ -35,6 +36,19 @@ if 'tdzAcceptPayload(conn)' in old_tcp or 'EnableTDZPayload()' in old_tcp:
 def replace(name, before, after):
     path = root / name
     text = path.read_text()
+    if before in ('type TCPConfig struct {', 'type StreamConfig struct {', 'type MemoryStreamConfig struct {'):
+        field = 'InjectPayload' if before.startswith('type TCPConfig') else 'AcceptPayloads'
+        start = text.index(before)
+        end = text.index('\n}', start)
+        block = text[start:end]
+        matches = list(re.finditer(r'^\s*' + field + r'\s+\*?bool[^\n]*$', block, re.MULTILINE))
+        if matches:
+            # gofmt aligns fields; recognize the existing field independently
+            # of whitespace, and remove duplicates left by older cached builds.
+            for match in reversed(matches[1:]):
+                block = block[:match.start()] + block[match.end():]
+            path.write_text(text[:start] + block + text[end:])
+            return
     if after in text:
         return
     if text.count(before) != 1:

@@ -144,7 +144,7 @@ func TestTDZLimitMissingOrInvalidConfigDoesNotSilentlyDisable(t *testing.T) {
 func TestTDZLimitRejectsHiddenProxySources(t *testing.T) {
 	limiter := tdzIPLimiter{limits: map[string]int{"limited": 1}}
 	online := corestats.NewOnlineMap()
-	for _, ip := range []string{"127.0.0.1", "127.0.0.2", "::1", "::ffff:127.0.0.1", "10.0.0.1", "192.168.1.1", "fc00::1", "fe80::1"} {
+	for _, ip := range []string{"127.0.0.1", "127.0.0.2", "::1", "::ffff:127.0.0.1", "10.0.0.1", "192.168.1.1", "fc00::1", "fd53:1:2:3::4", "fe80::1"} {
 		if _, _, err := limiter.acquire(context.Background(), "limited", ip, "", online); err == nil {
 			t.Fatalf("hidden relay source was admitted: %s", ip)
 		}
@@ -165,4 +165,54 @@ func TestTDZLimitRejectsHiddenProxySources(t *testing.T) {
 		t.Fatal("unlimited account changed behavior", err)
 	}
 	unlimited()
+}
+
+func TestTDZDNSExemptionRetainsAccountCancellationWithoutIPSlots(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "limits.json")
+	if err := os.WriteFile(path, []byte(`{"client":1}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var limiter tdzIPLimiter
+	online := corestats.NewOnlineMap()
+	_, directRelease, err := limiter.acquire(context.Background(), "client", "192.0.2.2", path, online)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directRelease()
+	dnsCtx, closeDNS := context.WithCancel(context.Background())
+	defer closeDNS()
+	var children []context.Context
+	for index := 0; index < 55; index++ {
+		limiter.mu.Lock()
+		child, release := limiter.acquireDNSLocked(context.Background(), "client", dnsCtx)
+		limiter.mu.Unlock()
+		t.Cleanup(release)
+		children = append(children, child)
+	}
+	if online.Count() != 1 || len(limiter.active["client"]) != 1 {
+		t.Fatal("DNS streams consumed normal IP slots")
+	}
+	if _, _, err := limiter.acquire(context.Background(), "client", "192.0.2.3", path, online); err == nil {
+		t.Fatal("DNS exemption disabled ordinary IP admission")
+	}
+	if err := os.WriteFile(path, []byte(`{"client":2}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	limiter.reload(path)
+	for _, child := range children {
+		if child.Err() != nil {
+			t.Fatal("IP-limit update cancelled exempt DNS traffic")
+		}
+	}
+	if err := os.WriteFile(path, []byte(`{}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	limiter.reload(path)
+	for _, child := range children {
+		select {
+		case <-child.Done():
+		case <-time.After(time.Second):
+			t.Fatal("disabled account retained DNS traffic")
+		}
+	}
 }

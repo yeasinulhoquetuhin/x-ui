@@ -24,11 +24,13 @@ type tdzIPState struct {
 // Slots are shared by authenticated email and canonical IP across all inbounds
 // in one core instance. A mutex makes concurrent admission checks atomic.
 type tdzIPLimiter struct {
-	mu       sync.Mutex
-	limits   map[string]int
-	active   map[string]map[string]*tdzIPState
-	sequence uint64
-	info     os.FileInfo
+	mu     sync.Mutex
+	limits map[string]int
+	active map[string]map[string]*tdzIPState
+	// DNS streams retain account-removal cancellation, without IP slots/stats.
+	dnsStreams map[string]*tdzIPState
+	sequence   uint64
+	info       os.FileInfo
 }
 
 func (l *tdzIPLimiter) reloadLocked(path string) ([]context.CancelFunc, error) {
@@ -57,6 +59,15 @@ func (l *tdzIPLimiter) reloadLocked(path string) ([]context.CancelFunc, error) {
 	}
 	l.limits, l.info = limits, info
 	var stops []context.CancelFunc
+	for email, state := range l.dnsStreams {
+		if _, enabled := limits[email]; enabled {
+			continue
+		}
+		for _, stop := range state.streams {
+			stops = append(stops, stop)
+		}
+		delete(l.dnsStreams, email)
+	}
 	for email, ips := range l.active {
 		limit, enabled := limits[email]
 		if !enabled {
@@ -116,6 +127,39 @@ func (l *tdzIPLimiter) reload(path string) {
 	}
 }
 
+// Called under l.mu after normal account-policy validation. Native DNSTT is
+// exempt only from IP admission/online-IP stats; account and tunnel teardown
+// still cancel its streams. A private address alone never grants exemption.
+func (l *tdzIPLimiter) acquireDNSLocked(ctx context.Context, email string, dnsContext context.Context) (context.Context, func()) {
+	if l.dnsStreams == nil {
+		l.dnsStreams = make(map[string]*tdzIPState)
+	}
+	state := l.dnsStreams[email]
+	if state == nil {
+		state = &tdzIPState{streams: make(map[uint64]context.CancelFunc)}
+		l.dnsStreams[email] = state
+	}
+	l.sequence++
+	id := l.sequence
+	child, cancel := context.WithCancel(ctx)
+	state.streams[id] = cancel
+	var once sync.Once
+	release := func() {
+		once.Do(func() {
+			cancel()
+			l.mu.Lock()
+			delete(state.streams, id)
+			if len(state.streams) == 0 && l.dnsStreams[email] == state {
+				delete(l.dnsStreams, email)
+			}
+			l.mu.Unlock()
+		})
+	}
+	stopRelease := context.AfterFunc(child, release)
+	stopDNS := context.AfterFunc(dnsContext, cancel)
+	return child, func() { stopDNS(); stopRelease(); release() }
+}
+
 // acquire counts streams until their outbound completes or their context is
 // cancelled, including MUX and long-lived streams with no new access-log lines.
 func (l *tdzIPLimiter) acquire(ctx context.Context, email, source, path string, online stats.OnlineMap) (context.Context, func(), error) {
@@ -128,6 +172,7 @@ func (l *tdzIPLimiter) acquire(ctx context.Context, email, source, path string, 
 		return nil, nil, fmt.Errorf("invalid client source IP %q", source)
 	}
 	canonical := ip.String()
+	dnsContext, _, slowDNS := internet.TDZSlowDNSSourceInfo(canonical)
 	l.mu.Lock()
 	var stops []context.CancelFunc
 	if path != "" {
@@ -143,6 +188,14 @@ func (l *tdzIPLimiter) acquire(ctx context.Context, email, source, path string, 
 			}
 			return nil, nil, fmt.Errorf("client IP policy is not published for %q", email)
 		}
+	}
+	if slowDNS {
+		child, release := l.acquireDNSLocked(ctx, email, dnsContext)
+		l.mu.Unlock()
+		for _, stop := range stops {
+			stop()
+		}
+		return child, release, nil
 	}
 	if l.limits[email] > 0 && !tdzPublicClientIP(ip) {
 		l.mu.Unlock()
@@ -234,15 +287,15 @@ func (d *DefaultDispatcher) admitTDZClient(ctx context.Context) (context.Context
 	if inbound == nil || inbound.User == nil || inbound.User.Email == "" {
 		return ctx, func() {}, nil
 	}
-	var online stats.OnlineMap
-	if d.policy.ForLevel(inbound.User.Level).Stats.UserOnline {
-		online, _ = stats.GetOrRegisterOnlineMap(d.stats, "user>>>"+inbound.User.Email+">>>online")
-	}
 	source := inbound.Source.Address.String()
 	if inbound.Local.IsValid() {
 		if mapped, ok := internet.TDZLocalProxyIP(inbound.Source.NetAddr(), inbound.Local.NetAddr()); ok {
 			source = mapped
 		}
+	}
+	var online stats.OnlineMap
+	if !internet.TDZIsSlowDNSSource(source) && d.policy.ForLevel(inbound.User.Level).Stats.UserOnline {
+		online, _ = stats.GetOrRegisterOnlineMap(d.stats, "user>>>"+inbound.User.Email+">>>online")
 	}
 	child, release, err := d.tdzIPs.acquire(ctx, inbound.User.Email, source, os.Getenv("TDZ_XRAY_IP_LIMITS"), online)
 	if err != nil {

@@ -553,43 +553,39 @@
       </table>
     </template>
     </template>
+  <template v-if="slowDNSInfo">
+    <a-divider>SlowDNS</a-divider>
+    <a-descriptions bordered :column="1" size="small" style="margin-bottom:16px">
+      <a-descriptions-item label="NameServer"><code @click="copy(slowDNSInfo.domain)" style="word-break:break-all;cursor:pointer">[[ slowDNSInfo.domain ]]</code></a-descriptions-item>
+      <a-descriptions-item label="Public Key"><code @click="copy(slowDNSInfo.publicKey)" style="word-break:break-all;cursor:pointer">[[ slowDNSInfo.publicKey ]]</code></a-descriptions-item>
+    </a-descriptions>
+  </template>
 </a-modal>
 <script>
+  function isSlowDNSRecord(record) {
+    if (record && typeof record === 'object') {
+      return record.source === 'slowdns' || /^fd53:/i.test(record.ip || record.IP || '');
+    }
+    return /^(?:fd53:|SlowDNS(?: session|-[0-9]))/i.test(String(record == null ? '' : record));
+  }
+  function formatClientSource(source) {
+    if (isSlowDNSRecord(source)) return '';
+    return String(source && typeof source === 'object' ? (source.ip || source.IP || '') : (source == null ? '' : source));
+  }
+  function formatClientIPRecord(record) {
+    const source = formatClientSource(record);
+    const timestamp = record && typeof record === 'object' ? (record.timestamp || record.Timestamp || 0) : 0;
+    if (!source || !timestamp) return source;
+    const date = new Date(Number(timestamp) * 1000);
+    const pad = value => String(value).padStart(2, '0');
+    const time = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    return `${source} (${time})`;
+  }
   function refreshIPs(email) {
     return HttpUtil.post(`/panel/api/inbounds/clientIps/${encodeURIComponent(email)}`).then((msg) => {
       if (!msg.success) {
         return { text: 'Live IP tracking unavailable', array: [], error: true };
       }
-
-      const formatIpRecord = (record) => {
-        if (record == null) {
-          return '';
-        }
-        if (typeof record === 'string' || typeof record === 'number') {
-          return String(record);
-        }
-        const ip = record.ip || record.IP || '';
-        const timestamp = record.timestamp || record.Timestamp || 0;
-        if (!ip) {
-          return String(record);
-        }
-        if (!timestamp) {
-          return String(ip);
-        }
-        const date = new Date(Number(timestamp) * 1000);
-        const timeStr = date
-          .toLocaleString('en-GB', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-          })
-          .replace(',', '');
-        return `${ip} (${timeStr})`;
-      };
 
       try {
         let ips = msg.obj;
@@ -601,6 +597,7 @@
           try {
             ips = JSON.parse(ips);
           } catch (e) {
+            if (isSlowDNSRecord(ips)) return { text: 'No IP Record', array: [] };
             return { text: String(ips), array: [String(ips)] };
           }
         }
@@ -613,16 +610,18 @@
           return { text: 'No IP Record', array: [] };
         }
 
-        // New format or object array
-        if (Array.isArray(ips) && ips.length > 0 && typeof ips[0] === 'object') {
-          const result = [...new Set(ips.map((item) => formatIpRecord(item)).filter(Boolean))];
-          return { text: result.join(' | '), array: result };
-        }
-
-        // Old format - simple array of IPs
         if (Array.isArray(ips) && ips.length > 0) {
-          const result = [...new Set(ips.map((ip) => String(ip)).filter(Boolean))];
-          return { text: result.join(', '), array: result };
+          const seen = new Set();
+          const result = [];
+          ips.forEach((record) => {
+            if (isSlowDNSRecord(record)) return;
+            const key = formatClientSource(record);
+            if (seen.has(key)) return;
+            seen.add(key);
+            const text = formatClientIPRecord(record);
+            if (text) result.push(text);
+          });
+          return { text: result.join(' | '), array: result };
         }
 
         // Fallback for any other format
@@ -636,6 +635,7 @@
 
   const infoModal = {
     visible: false,
+    slowDNS: { installed: false },
     inbound: new Inbound(),
     dbInbound: new DBInbound(),
     clientSettings: null,
@@ -657,6 +657,10 @@
     refreshing: false,
     show(dbInbound, index) {
       const requestID = ++this.ipRequestID;
+      this.slowDNS = app.slowDNS || { installed: false };
+      if (typeof app.getDefaultSettings === 'function') app.getDefaultSettings().then(() => {
+        if (this.ipRequestID === requestID) this.slowDNS = app.slowDNS || { installed: false };
+      });
       this.clearingIps = false;
       this.loadingIps = false;
       this.refreshing = false;
@@ -759,6 +763,9 @@
       },
     },
     computed: {
+      slowDNSInfo: {
+        get() { return this.slowDNSDetails(); },
+      },
       refreshing: {
         get() { return this.infoModal.refreshing; },
         set(value) { this.infoModal.refreshing = value; },
@@ -769,6 +776,12 @@
       },
     },
     methods: {
+      slowDNSDetails() {
+        const cfg = this.infoModal.slowDNS || {};
+        const inbound = this.infoModal.inbound;
+        if (!cfg.installed || !cfg.publicKey || !inbound.stream.slowDNS || !inbound.canEnableSlowDNS()) return null;
+        return { domain: cfg.nsDomain, publicKey: cfg.publicKey };
+      },
       isTrafficResetEnabled() {
         const period = this.infoModal.clientSettings?.trafficReset;
         return !!period && period !== 'never';
@@ -788,33 +801,7 @@
         }).length;
       },
       formatIpInfo(ipInfo) {
-        if (ipInfo == null) {
-          return '';
-        }
-        if (typeof ipInfo === 'string' || typeof ipInfo === 'number') {
-          return String(ipInfo);
-        }
-        const ip = ipInfo.ip || ipInfo.IP || '';
-        const timestamp = ipInfo.timestamp || ipInfo.Timestamp || 0;
-        if (!ip) {
-          return String(ipInfo);
-        }
-        if (!timestamp) {
-          return String(ip);
-        }
-        const date = new Date(Number(timestamp) * 1000);
-        const timeStr = date
-          .toLocaleString('en-GB', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-          })
-          .replace(',', '');
-        return `${ip} (${timeStr})`;
+        return formatClientIPRecord(ipInfo);
       },
       copy(content) {
         ClipboardManager

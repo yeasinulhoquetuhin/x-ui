@@ -35,11 +35,15 @@ RUN apk add --no-cache --update \
   fail2ban \
   bash \
   curl \
+  iptables \
+  nftables \
+  util-linux \
   openssl
 
 COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
 COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
+COPY --from=builder /app/resources/ /app/resources/
 
 
 # Configure fail2ban

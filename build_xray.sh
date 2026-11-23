@@ -36,9 +36,10 @@ fi
 cp "$root/xray-patches/testdata/tdz_ip_limit.go" "$source_dir/app/dispatcher/tdz_ip_limit.go"
 cp "$root/xray-patches/testdata/tdz_ip_limit_test.go" "$source_dir/app/dispatcher/tdz_ip_limit_test.go"
 cp "$root/xray-patches/testdata/tdz_session.go" "$source_dir/common/session/tdz_session.go"
+"$python_cmd" "$root/xray-patches/apply_slowdns.py" "$source_dir"
 mkdir -p "$(dirname "$destination")"
 export CGO_ENABLED=0
 (
     cd "$source_dir"
-    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2+Payload/3+Auto/1' -o "$destination" ./main
+    go build -trimpath -ldflags '-s -w -X github.com/xtls/xray-core/core.build=TDZ-IPLimit/2+Payload/3+Auto/1+SlowDNS/1' -o "$destination" ./main
 )

@@ -9,6 +9,7 @@
     <a-switch v-model="inbound.stream.acceptPayloads"
       @change="checked => { if (checked) inbound.stream.tcp.type = 'none'; }"></a-switch>
   </a-form-item>
+  {{template "form/streamSlowDNS"}}
   <a-form-item label="Proxy Protocol" v-if="inbound.canEnableTls()">
     <a-switch v-model="inbound.stream.tcp.acceptProxyProtocol"></a-switch>
   </a-form-item>

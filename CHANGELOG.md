@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.9.3-patched.5 — 2026-11-23
+
+### Fixed
+
+- SlowDNS limited-client connection failure caused by unresolved localhost relay addresses.
+- Native DNSTT is excluded from IP admission/counts/logs, including apps that create many tunnels during one VPN connection.
+- New inbound changes are committed before publishing DNS routes and updating the live listener.
+- Abandoned DNS tunnels reclaim resources through a 15-second activity lease and cancel streams without reserving ordinary IP-limit slots.
+- The common NS domain routes distinct client credentials to the correct inbound without a client-visible inbound prefix.
+- Subscription pages use native document scrolling, avoiding mobile fixed-container scroll stalls before interacting with settings.
+
+### Added
+
+- **23. SlowDNS Management** with install, reconfigure, status, start/stop, uninstall and explicit key regeneration.
+- Default-off SlowDNS switches on supported NTLS VLESS/VMess/Trojan/Shadowsocks TCP transports.
+- Persistent database X25519 keys, retained across domain/MTU edits and SlowDNS reinstall.
+- Bottom client More Information and opt-in subscription NameServer and Public Key fields, clickable to copy.
+- Domain-scoped DNS routing for TDZ SSH coexistence with separate sibling zones.
+
+### Improved
+
+- Shared in-process UDP listener, 100ms KCP updates and bounded stream buffers for lower CPU/RAM demand.
+- DNS session identifiers and resolver IPs are excluded from IP Log and subscription IP counts; ordinary IP reporting/admission remains active on DNS-enabled inbounds.
+- Google/Cloudflare resolvers are accepted; client cards omit resolver and MTU fields.
+- Menu 23 retains a simple flow; its option 3 details page stays open until 0 returns to the main menu.
+- README branding/support tables, ALPN explanation and a dedicated SlowDNS guide.
+- BBR, Geo Files and Speedtest move to CLI options 24, 25 and 26.
+
+### Verification
+
+- Stock-DNSTT traffic across 20 protocol/transport combinations, multiple DNS tunnels at limit 1, and common-NS credential routing.
+- Mixed traffic verifies ordinary first-IP admission/second-IP rejection while DNSTT remains connected and uncounted.
+- Core races, account-removal cancellation, full Go checks, installer/menu/client tests and mobile/desktop subscription scrolling.
+
 ## v2.9.3-patched.4 — 2026-11-16
 
 ### Added

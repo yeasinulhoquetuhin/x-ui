@@ -797,6 +797,7 @@ func (s *SettingService) GetDefaultSettings(host string) (any, error) {
 		"remarkModel":    func() (any, error) { return s.GetRemarkModel() },
 		"datepicker":     func() (any, error) { return s.GetDatepicker() },
 		"ipLimitEnable":  func() (any, error) { return s.GetIpLimitEnable() },
+		"slowDNS":        func() (any, error) { var service SlowDNSService; return service.GetConfig() },
 	}
 
 	result := make(map[string]any)

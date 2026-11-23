@@ -299,6 +299,13 @@ func (p *process) Start() (err error) {
 		return err
 	}
 	cmd.Env = append(os.Environ(), "TDZ_XRAY_IP_LIMITS="+limitPath)
+	if p.configPath == "" {
+		slowDNSPath, err := filepath.Abs(GetSlowDNSConfigPath())
+		if err != nil {
+			return err
+		}
+		cmd.Env = append(cmd.Env, "TDZ_XRAY_SLOWDNS="+slowDNSPath)
+	}
 	p.cmd = cmd
 
 	cmd.Stdout = p.logWriter

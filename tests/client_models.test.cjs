@@ -32,6 +32,29 @@ test('Accept Payloads persists when switching supported transports and reopening
   }
 });
 
+test('SlowDNS is opt-in and only serializes on supported non-TLS transports', () => {
+  vm.runInContext('this.Stream = StreamSettings;', context);
+  assert.equal(context.Stream.fromJson().slowDNS, false);
+  for (const protocol of ['vless', 'vmess', 'trojan', 'shadowsocks']) {
+    const inbound = Object.create(context.Inbound.prototype);
+    inbound.protocol = protocol; inbound.listen = '';
+    for (const network of ['tcp', 'ws', 'httpupgrade', 'grpc', 'xhttp']) {
+      inbound.stream = context.Stream.fromJson({network, security:'none', slowDNS:true});
+      assert.equal(inbound.canEnableSlowDNS(), true);
+      assert.equal(context.Stream.fromJson(inbound.stream.toJson()).slowDNS, true);
+      for (const security of ['tls', 'reality']) {
+        inbound.stream.security = security;
+        assert.equal(inbound.canEnableSlowDNS(), false);
+        assert.equal(inbound.stream.toJson().slowDNS, undefined);
+      }
+    }
+  }
+  const inbound = Object.create(context.Inbound.prototype);
+  inbound.listen = ''; inbound.protocol = 'vless'; inbound.stream = context.Stream.fromJson({network:'kcp', slowDNS:true});
+  assert.equal(inbound.canEnableSlowDNS(), false);
+  assert.equal(inbound.stream.toJson().slowDNS, undefined);
+});
+
 test('copied links omit the inbound prefix with legacy remark settings', () => {
   context.ObjectUtil = {isEmpty:value=>!value,isArrEmpty:value=>!value?.length};
   context.location = {hostname:'example.test'};
@@ -47,13 +70,15 @@ test('copied links omit the inbound prefix with legacy remark settings', () => {
 
 for (const [settings, name] of [['VmessSettings', 'VMESS'], ['VLESSSettings', 'VLESS'], ['TrojanSettings', 'Trojan'], ['ShadowsocksSettings', 'Shadowsocks'], ['HysteriaSettings', 'Hysteria']]) {
   test(`${settings} preserves automatic traffic-reset settings`, () => {
-    const input = { email: 'client', enable: true, tgId: '-1001234567890', trafficReset: 'custom', trafficResetDays: 15, showIpLimit: true, limitIp: 1, created_at: 12, updated_at: 34 };
+    const input = { email: 'client', enable: true, tgId: '-1001234567890', trafficReset: 'custom', trafficResetDays: 15, showIpLimit: true, showSlowDNS: true, limitIp: 1, created_at: 12, updated_at: 34 };
     const client = context.Inbound[settings][name].fromJson(input);
     const json = client.toJson();
     assert.equal(json.trafficReset, 'custom');
     assert.equal(json.trafficResetDays, 15);
     assert.equal(json.limitIp, 1);
     assert.equal(json.showIpLimit, true);
+    assert.equal(json.showSlowDNS, true);
+    assert.equal(new context.Inbound[settings][name]().showSlowDNS, false);
     assert.equal(new context.Inbound[settings][name]().showIpLimit, false);
     assert.equal(json.created_at, 12);
     assert.equal(json.updated_at, 34);
@@ -64,7 +89,7 @@ for (const [settings, name] of [['VmessSettings', 'VMESS'], ['VLESSSettings', 'V
 
 test('IP display handles empty and failed snapshots without counting placeholders', async () => {
   const html = fs.readFileSync(path.join(root, 'web/html/modals/inbound_info_modal.html'), 'utf8');
-  const helper = html.slice(html.indexOf('function refreshIPs(email)'), html.indexOf('const infoModal ='));
+  const helper = html.slice(html.indexOf('function isSlowDNSRecord(record)'), html.indexOf('const infoModal ='));
   const ctx = vm.createContext({HttpUtil: {post: async () => ({success:true, obj:[]})}});
   vm.runInContext(helper, ctx);
   assert.equal((await ctx.refreshIPs('client')).array.length, 0);
@@ -76,6 +101,19 @@ test('IP display handles empty and failed snapshots without counting placeholder
   assert.equal((await ctx.refreshIPs('client')).array.length, 1);
   ctx.HttpUtil.post = async () => ({success:true, obj:['192.0.2.1', '192.0.2.1', '192.0.2.2']});
   assert.equal((await ctx.refreshIPs('client')).array.length, 2);
+  ctx.HttpUtil.post = async () => ({success:true, obj:[{ip:'fd53:1:2:3::4',timestamp:1760000000}]});
+  assert.equal((await ctx.refreshIPs('client')).array.length, 0);
+  ctx.HttpUtil.post = async () => ({success:true, obj:[
+    {source:'slowdns',tunnelId:'one',timestamp:1760000000},
+    {source:'slowdns',tunnelId:'two',timestamp:1760000000},
+    {source:'slowdns',tunnelId:'one',timestamp:1760000000},
+    {ip:'103.31.152.238',timestamp:1760000000},
+  ]});
+  const sessions = (await ctx.refreshIPs('client')).array;
+  assert.equal(sessions.length, 1);
+  assert.match(sessions[0], /^103\.31\.152\.238 /);
+  ctx.HttpUtil.post = async () => ({success:true, obj:['SlowDNS-01 (2026-01-01)', 'fd53:1:2:3::4', '103.31.152.238 (2026-01-01)']});
+  assert.equal((await ctx.refreshIPs('client')).array.length, 1);
   ctx.HttpUtil.post = async () => { throw new Error('API disconnected'); };
   assert.equal((await ctx.refreshIPs('client')).error, true);
 });

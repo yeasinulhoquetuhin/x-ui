@@ -2206,6 +2206,103 @@ show_usage() {
 └────────────────────────────────────────────────────────────────┘"
 }
 
+slowdns_apply() {
+    if [[ $(check_status) == 0 ]]; then
+        restart_xray 0
+    else
+        LOGI "Saved. SlowDNS will apply when the panel starts."
+    fi
+}
+
+slowdns_requirements() {
+    if command -v iptables >/dev/null 2>&1 && command -v nft >/dev/null 2>&1 && command -v flock >/dev/null 2>&1; then
+        return 0
+    fi
+    LOGI "Installing SlowDNS shared-port networking dependencies..."
+    case "$release" in
+    ubuntu|debian) apt-get update -qq && apt-get install -y iptables nftables util-linux ;;
+    alpine) apk add iptables nftables util-linux ;;
+    arch|manjaro|parch) pacman -Sy --noconfirm iptables nftables util-linux ;;
+    *)
+        if command -v dnf >/dev/null 2>&1; then dnf install -y iptables nftables util-linux
+        elif command -v yum >/dev/null 2>&1; then yum install -y iptables nftables util-linux
+        else LOGE "Install iptables, nftables and util-linux for your distribution."; return 1
+        fi
+        ;;
+    esac
+}
+
+slowdns_configure() {
+    local action="${1:-configure}" binary=/usr/local/x-ui/x-ui
+    local host_domain ns_domain listen mtu
+    local -a saved
+    slowdns_requirements || return 1
+    mapfile -t saved < <("$binary" slowdns status --defaults)
+    if [[ ${#saved[@]} -ne 4 ]]; then
+        LOGE "SlowDNS requires the V5 panel and its matching core. Update the panel first."
+        return 1
+    fi
+    echo "Press Enter to keep the saved value."
+    read -rp "A/AAAA host [${saved[0]}]: " host_domain || return
+    read -rp "NameServer [${saved[1]}]: " ns_domain || return
+    read -rp "UDP listener [${saved[2]}]: " listen || return
+    read -rp "MTU 512-4096 [${saved[3]}]: " mtu || return
+    "$binary" slowdns "$action" \
+        --host-domain "${host_domain:-${saved[0]}}" \
+        --ns-domain "${ns_domain:-${saved[1]}}" \
+        --listen "${listen:-${saved[2]}}" \
+        --mtu "${mtu:-${saved[3]}}" && slowdns_apply
+}
+
+slowdns_details() {
+    local choice binary=/usr/local/x-ui/x-ui
+    [[ -t 1 ]] && clear
+    "$binary" slowdns status --details || return
+    while true; do
+        read -rp "0. Back to Main Menu: " choice || return
+        if [[ "$choice" == 0 ]]; then show_menu; return; fi
+        LOGE "Enter 0 to leave this page."
+    done
+}
+
+slowdns_main() {
+    check_install 0 || return
+    local choice answer binary=/usr/local/x-ui/x-ui
+    while true; do
+        echo -e "\n${green}SlowDNS Management${plain}"
+        echo "1. Install / Set up"
+        echo "2. Edit / Reconfigure"
+        echo "3. Show NameServer / Public Key / Status"
+        echo "4. Start / Enable"
+        echo "5. Stop / Disable"
+        echo "6. Regenerate / Revoke Public Key"
+        echo "7. Uninstall SlowDNS"
+        echo "0. Back to Main Menu"
+        read -rp "Choose [0-7]: " choice || return
+        case "$choice" in
+        0) show_menu; return ;;
+        1) slowdns_configure install ;;
+        2) slowdns_configure configure ;;
+        3) slowdns_details; return ;;
+        4) "$binary" slowdns start && slowdns_apply ;;
+        5) "$binary" slowdns stop && slowdns_apply ;;
+        6)
+            read -rp "Revoke the old key and generate a new one? Clients will need the new public key [y/N]: " answer
+            if [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]]; then
+                "$binary" slowdns regenerate-key --yes && slowdns_apply
+            fi
+            ;;
+        7)
+            read -rp "Uninstall SlowDNS and disable it on all inbounds, retaining the keypair [y/N]: " answer
+            if [[ "$answer" == [yY] || "$answer" == [yY][eE][sS] ]]; then
+                "$binary" slowdns uninstall && slowdns_apply
+            fi
+            ;;
+        *) LOGE "Select a number from 0 to 7." ;;
+        esac
+    done
+}
+
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
@@ -2239,13 +2336,14 @@ show_menu() {
 │  ${green}21.${plain} Firewall Management                       │
 │  ${green}22.${plain} SSH Port Forwarding Management            │
 │────────────────────────────────────────────────│
-│  ${green}23.${plain} Enable BBR                                │
-│  ${green}24.${plain} Update Geo Files                          │
-│  ${green}25.${plain} Speedtest by Ookla                        │
+│  ${green}23.${plain} SlowDNS Management                        │
+│  ${green}24.${plain} Enable BBR                                │
+│  ${green}25.${plain} Update Geo Files                          │
+│  ${green}26.${plain} Speedtest by Ookla                        │
 ╚────────────────────────────────────────────────╝
 "
     show_status
-    echo && read -rp "Please enter your selection [0-25]: " num
+    echo && read -rp "Please enter your selection [0-26]: " num
 
     case "${num}" in
     0)
@@ -2318,16 +2416,19 @@ show_menu() {
         SSH_port_forwarding
         ;;
     23)
-        bbr_menu
+        slowdns_main
         ;;
     24)
-        update_geo
+        bbr_menu
         ;;
     25)
+        update_geo
+        ;;
+    26)
         run_speedtest
         ;;
     *)
-        LOGE "Please enter the correct number [0-25]"
+        LOGE "Please enter the correct number [0-26]"
         ;;
     esac
 }
@@ -2345,6 +2446,13 @@ if [[ $# > 0 ]]; then
         ;;
     "restart-xray")
         check_install 0 && restart_xray 0
+        ;;
+    "slowdns")
+        if [[ $# -eq 1 ]]; then
+            slowdns_main
+        else
+            check_install 0 && /usr/local/x-ui/x-ui "$@"
+        fi
         ;;
     "status")
         check_install 0 && status 0
