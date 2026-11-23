@@ -1,4 +1,11 @@
-# TDZ X-UI - And This is Best of X-UI 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/yeasinulhoquetuhin/x-ui/master/media/3x-ui-light.png" alt="Libs Tunnel project banner" width="100%">
+</p>
+
+
+# TDZ X-UI
+* This is Best of X-UI ❤️
+* TDZ X-UI is Always Best ❤️
 
 **A complete X-UI / 3X-UI control panel for Xray servers:** real-IP admission for ordinary connections, native encrypted SlowDNS, multi-inbound reseller management, scheduled traffic resets, and single-port TDZ payload acceptance.
 
