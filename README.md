@@ -1,4 +1,4 @@
-# TDZ X-UI — Always Best
+# TDZ X-UI - And This is Best of X-UI 
 
 **A complete X-UI / 3X-UI control panel for Xray servers:** real-IP admission for ordinary connections, native encrypted SlowDNS, multi-inbound reseller management, scheduled traffic resets, and single-port TDZ payload acceptance.
 
