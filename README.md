@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/github/license/yeasinulhoquetuhin/x-ui)](LICENSE)
 [![Build](https://github.com/yeasinulhoquetuhin/x-ui/actions/workflows/release.yml/badge.svg)](https://github.com/yeasinulhoquetuhin/x-ui/actions/workflows/release.yml)
 
-**Maintainer:** [Yeasinul Hoque Tuhin](https://github.com/yeasinulhoquetuhin)
+**Maintainer:** [Yeasinul Hoque Tuhin](https://tuhinbro.com)
 
 **V5:** [`2.9.3-patched.5`](https://github.com/yeasinulhoquetuhin/x-ui/releases/tag/v2.9.3-patched.5) · **Base:** 3X-UI 2.9.3 · **Xray:** 26.4.25
 
