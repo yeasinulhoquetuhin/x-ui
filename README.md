@@ -4,11 +4,12 @@
 
 
 # TDZ X-UI
-* This is Best of X-UI ❤️
-* TDZ X-UI is Always Best ❤️
 
 **A complete X-UI / 3X-UI control panel for Xray servers:** real-IP admission for ordinary connections, native encrypted SlowDNS, multi-inbound reseller management, scheduled traffic resets, and single-port TDZ payload acceptance.
 
+* This is Best of X-UI ❤️
+* TDZ X-UI is Always Best ❤️
+  
 [![Latest release](https://img.shields.io/github/v/release/yeasinulhoquetuhin/x-ui?label=release&color=008771)](https://github.com/yeasinulhoquetuhin/x-ui/releases/latest)
 [![License](https://img.shields.io/github/license/yeasinulhoquetuhin/x-ui)](LICENSE)
 [![Build](https://github.com/yeasinulhoquetuhin/x-ui/actions/workflows/release.yml/badge.svg)](https://github.com/yeasinulhoquetuhin/x-ui/actions/workflows/release.yml)
